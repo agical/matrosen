@@ -66,13 +66,11 @@
     .portion-line{display:flex;align-items:center;gap:var(--space-md)}
     .actual{font-size:13px;color:var(--muted);line-height:1.3;min-width:82px}
     .actual strong{font-size:20px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums;display:block;margin-bottom:2px}
-    .primary,.secondary,.text-button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;border-radius:5px;padding:10px 16px;font-size:14px;font-weight:600;transition:background-color .15s,color .15s}
+    .primary,.secondary{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;border-radius:5px;padding:10px 16px;font-size:14px;font-weight:600;transition:background-color .15s,color .15s}
     .primary{background:var(--ink);color:var(--surface);border:1px solid var(--ink);height:46px}
     .primary:hover:not(:disabled){background:oklch(41% .075 258)}
     .secondary{background:transparent;border:1px solid var(--line)}
     .secondary:hover:not(:disabled){background:var(--soft);border-color:var(--muted)}
-    .text-button{background:transparent;border:0;padding:8px;min-height:40px}
-    .text-button:hover:not(:disabled){background:var(--soft)}
     .target-note{margin:12px 0 0;font-size:13px;color:var(--muted)}
     .target-note strong{color:var(--ink);font-weight:600}
     .error{color:var(--amber);font-size:13px;margin:8px 0 0}
@@ -80,7 +78,7 @@
     .heading-line{display:flex;align-items:baseline;gap:var(--space-md);flex-wrap:wrap}
     h2{font-size:20px;letter-spacing:-.3px;font-weight:600;margin:0}
     .sort-count{font-size:13px;color:var(--muted)}
-    .order-actions{display:flex;gap:var(--space-sm);align-items:center}
+    .order-actions{display:flex;flex-wrap:wrap;gap:var(--space-sm);align-items:center}
     .table-wrap{border:1px solid var(--line);border-radius:6px;background:var(--surface)}
     table{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;font-variant-numeric:tabular-nums}
     col.include-col{width:64px}col.qty-col{width:176px}col.veg-col{width:108px}
@@ -156,8 +154,8 @@
       .shell{padding:24px 16px}.masthead{gap:12px;padding-bottom:20px}
       h1{font-size:clamp(24px,6vw,34px)}.subtitle{font-size:12px}.event-link{font-size:12px}
       .planner{padding:20px 0 24px}.planner-fields{column-gap:24px;row-gap:16px}.planner .primary{width:100%}
-      .order-heading{align-items:flex-start;gap:8px}.heading-line{display:block}.sort-count{display:block;margin-top:4px}
-      .order-actions{gap:0}.secondary{padding:9px 10px}.text-button{padding:8px}.undo-label{display:none}
+      .order-heading{align-items:flex-start;flex-wrap:wrap;gap:12px}.heading-line{display:block}.sort-count{display:block;margin-top:4px}
+      .secondary{padding:9px 10px}
       h2{font-size:18px}col.include-col{width:32px}col.qty-col{width:96px}col.veg-col{width:44px}
       thead th{padding:10px 8px;font-size:11px}thead .numeric{padding-right:10px}
       tbody td,tbody th{padding:10px 4px;height:64px}.toggle-label{min-width:32px;min-height:54px}
@@ -375,6 +373,35 @@
          (or (< (js/Math.abs (- total 1)) 1e-9)
              (and (zero? total) (zero? (:total (totals order))))))))
 
+;; Share stable dish IDs and full-precision shares, independently of local storage.
+(def site-url "https://agical.github.io/matrosen/")
+(defn shareable? [order]
+  (and (valid-stored-order? order) (valid-stored-shares? order)))
+(defn share-link [order]
+  (str site-url "#plan="
+       (js/encodeURIComponent
+         (js/JSON.stringify
+           (clj->js {:v 1 :guests (:guests order) :per-person (:per-person order)
+                     :rows (mapv (fn [{:keys [id]}]
+                                   (let [{:keys [enabled? qty share]} (get-in order [:rows id])]
+                                     [(name id) enabled? qty share])) menu)})))))
+(defn read-shared-plan [fragment]
+  (when (str/starts-with? fragment "#plan=")
+    (try
+      (when (> (count fragment) 12000) (throw (js/Error. "Oversized shared plan")))
+      (let [{:keys [v guests per-person rows]}
+            (js->clj (js/JSON.parse (js/decodeURIComponent (subs fragment 6))) :keywordize-keys true)
+            known-ids (into {} (map (fn [{:keys [id]}] [(name id) id]) menu))]
+        (if (and (= 1 v) (vector? rows) (= (count menu) (count rows))
+                 (every? #(and (vector? %) (= 4 (count %)) (contains? known-ids (first %))) rows)
+                 (= (set (keys known-ids)) (set (map first rows))))
+          (let [order {:guests guests :per-person per-person
+                       :rows (into {} (map (fn [[id enabled? qty share]]
+                                            [(known-ids id) {:enabled? enabled? :qty qty :share share}]) rows))}]
+            (if (shareable? order) {:order order} {:error true}))
+          {:error true}))
+      (catch :default _ {:error true}))))
+
 (defn format-number [n]
   (.toLocaleString n "sv-SE" #js {:maximumFractionDigits 2}))
 (defn order-text [value]
@@ -404,7 +431,7 @@
      :close [:path {:d "m6 6 12 12M6 18 18 6"}]
      :photo [:g [:rect {:x 3 :y 4 :width 18 :height 16 :rx 2}] [:circle {:cx 8 :cy 9 :r 1.5}] [:path {:d "m3 17 5-5 4 4 4-6 5 7"}]]
      :copy [:g [:rect {:x 8 :y 8 :width 12 :height 13 :rx 2}] [:path {:d "M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"}]]
-     :undo [:path {:d "m8 4-5 5 5 5M3 9h11a6 6 0 0 1 0 12h-3"}]
+     :link [:g [:path {:d "m10 13 4-4M8 16l-1 1a4 4 0 0 1-6-6l4-4a4 4 0 0 1 6 0M16 8l1-1a4 4 0 0 1 6 6l-4 4a4 4 0 0 1-6 0"}]]
      :check [:path {:d "m5 12 4 4L19 6"}]
      :leaf [:g [:path {:d "M20 3C10 2 3 7 5 14c2 7 15 7 15-11Z"}] [:path {:d "m4 21 11-12"}]]
      :spread [:g [:path {:d "M4 6h16M4 12h16M4 18h16"}] [:path {:d "M8 4v4M16 10v4M11 16v4"}]]
@@ -458,7 +485,7 @@
                           :on {:click [[:order/ax.step id 1]]}} "+"]]]
      [:td.numeric.veg-number {:class (when-not vego? "no-veg")}
       (if vego? (quantity row) [:span {:aria-label "0 vegetariska"} "–"])]]))
-(defn app [{:keys [order history ui]}]
+(defn app [{:keys [order ui]}]
   (let [value order {:keys [total vego]} (totals value) desired (target value)
         guests (number-value (:guests value)) ids (active-ids value)
         settings-valid? (valid-settings? value) rows-valid? (valid-rows? value)
@@ -499,8 +526,9 @@
       [:div.order-heading
        [:div.heading-line [:h2#order-title "Din beställning"] [:span.sort-count (str (count ids) " av " (count menu) " sorter")]]
        [:div.order-actions
-        [:button.text-button {:on {:click [[:order/ax.undo]]} :disabled (empty? history) :aria-label "Ångra senaste ändringen" :title "Ångra senaste ändringen"}
-         (icon :undo) [:span.undo-label "Ångra"]]
+        [:button.secondary {:on {:click [[:order/ax.share]]} :disabled (not (matrosen.model/shareable? value))
+                            :title "Kopiera en länk med alla antal, val och fördelningsprocent"}
+         (icon :link) "Kopiera för delning"]
         [:button.secondary {:on {:click [[:order/ax.copy]]} :disabled (or (not settings-valid?) (not rows-valid?) (zero? total))}
          (icon :copy) "Kopiera"]]]
       [:div.notice {:role "status" :aria-live "polite"} (:notice ui)]
@@ -526,7 +554,7 @@
           :else (str (format-number (- difference)) " färre än målet på " (format-number desired))) ]
        [:span.saved (:saved ui)]]
       (when-let [text (:copy-text ui)]
-        [:div.copy-fallback [:label {:for "copy-text"} "Din beställning som text"]
+        [:div.copy-fallback [:label {:for "copy-text"} (if (= :link (:copy-kind ui)) "Länk till din beställning" "Din beställning som text")]
          [:textarea#copy-text {:value text :readonly true :on {:focus [[:ui/ax.select-input "copy-text"]]}}]])
       [:p.menu-note [:strong "*Vego"] " enligt menybeskrivningarna, med ägg och mjölk. Bekräfta med Matrosen. Gamle Ole räknas inte som vego eftersom den serveras med skygelé."]]
      [:footer.footer
@@ -542,7 +570,7 @@
   (:require [matrosen.model :as model]))
 
 (defonce !state
-  (atom {:order (model/default-order) :history [] :initialized? false
+  (atom {:order (model/default-order) :initialized? false
          :ui {:notice nil :saved "" :copy-text nil}}))
 
 (ns matrosen.actions
@@ -576,8 +604,6 @@
 (defn change-order [db value message]
   (merge
     {:uf/db (-> db
-                (cond-> (not= value (:order db))
-                  (update :history #(vec (take-last 30 (conj % (:order db))))))
                 (assoc :order value)
                 (assoc-in [:ui :notice] message)
                 (assoc-in [:ui :copy-text] nil)
@@ -604,20 +630,31 @@
       {:uf/fxs [[:uf/await :storage/fx.load]]
        :uf/dxs [[:storage/ax.loaded :uf/prev-result]]})
 
+    :share/ax.load
+    {:uf/fxs [[:uf/await :storage/fx.load]]
+     :uf/dxs [[:storage/ax.loaded :uf/prev-result]]}
+
     :storage/ax.loaded
-    (let [{:keys [success value]} (first args)
+    (let [{:keys [success value fragment]} (first args)
+          shared (model/read-shared-plan (or fragment ""))
           version (:version value)
           valid? (and (#{1 2} version) (model/valid-stored-order? (:order value))
                       (or (= 1 version) (model/valid-stored-shares? (:order value))))
-          order (if valid?
-                  (if (= 1 version) (model/update-shares (:order value)) (:order value))
-                  (:order db))]
-      (merge {:uf/db (-> db (assoc :order order :initialized? true)
-                         (assoc-in [:ui :saved] (if success "Sparar…" "Lokalt sparande är inte tillgängligt"))
-                         (assoc-in [:ui :notice]
-                                   (when (and success (some? value) (not valid?))
-                                     "Den sparade beställningen kunde inte läsas. Ett nytt förslag visas.")))}
-             (when success (save-recipe order))))
+          local (if (and (not (:initialized? db)) valid?)
+                  (if (= 1 version) (model/update-shares (:order value)) (:order value)) (:order db))
+          order (or (:order shared) local)]
+      (cond->
+        (merge {:uf/db (-> db (assoc :order order :initialized? true)
+                           (assoc-in [:ui :copy-text] nil)
+                           (assoc-in [:ui :preview] nil)
+                           (assoc-in [:ui :saved] (if success "Sparar…" "Lokalt sparande är inte tillgängligt"))
+                           (assoc-in [:ui :notice]
+                                     (cond
+                                       (:order shared) "Den delade beställningen är öppnad. Alla antal och fördelningsprocent är bevarade."
+                                       (:error shared) "Delningslänken kunde inte läsas. Din befintliga beställning visas."
+                                       (and success (some? value) (not valid?)) "Den sparade beställningen kunde inte läsas. Ett nytt förslag visas.")))}
+               (when success (save-recipe order)))
+        (:order shared) (update :uf/fxs (fnil conj []) [:url/fx.clear-plan fragment])))
 
     :storage/ax.saved
     {:uf/db (assoc-in db [:ui :saved]
@@ -663,25 +700,29 @@
                     "Sorten är avstängd.")
                 "Sorten är aktiverad med 0 och 0 %. Använd + eller ange ett antal för att ge den en andel."))))))
 
-    :order/ax.undo
-    (when-let [previous (peek (:history db))]
-      (assoc-in (change-order db previous "Senaste ändringen ångrades.")
-                [:uf/db :history] (pop (:history db))))
+    :order/ax.share
+    (when (model/shareable? (:order db))
+      (let [link (model/share-link (:order db))]
+        {:uf/fxs [[:uf/await :clipboard/fx.write link]]
+         :uf/dxs [[:clipboard/ax.copied :link link :uf/prev-result]]}))
 
     :order/ax.copy
     (let [order (:order db)]
       (when (and (model/valid-settings? order) (model/valid-rows? order) (pos? (:total (model/totals order))))
         (let [text (model/order-text order)]
           {:uf/fxs [[:uf/await :clipboard/fx.write text]]
-           :uf/dxs [[:clipboard/ax.copied text :uf/prev-result]]})))
+           :uf/dxs [[:clipboard/ax.copied :order text :uf/prev-result]]})))
 
     :clipboard/ax.copied
-    (let [[text result] args]
+    (let [[kind text result] args shared? (= :link kind)]
       {:uf/db (-> db
+                  (assoc-in [:ui :copy-kind] kind)
                   (assoc-in [:ui :copy-text] (when-not (:success result) text))
                   (assoc-in [:ui :notice]
-                            (if (:success result) "Beställningen är kopierad till klippbordet."
-                                "Markera och kopiera beställningen i textfältet nedan.")))})
+                            (if (:success result)
+                              (if shared? "Delningslänken är kopierad till klippbordet." "Beställningen är kopierad till klippbordet.")
+                              (if shared? "Markera och kopiera länken i textfältet nedan."
+                                  "Markera och kopiera beställningen i textfältet nedan."))))})
 
     :ui/ax.select-input
     {:uf/fxs [[:dom/fx.select-input (first args)]]}
@@ -717,12 +758,19 @@
       (set! (.-value element) (second args)))
 
     :storage/fx.load
-    (try
-      (let [raw (.getItem js/localStorage model/storage-key)]
-        {:success true :value (when raw
-                               (try (js->clj (js/JSON.parse raw) :keywordize-keys true)
-                                    (catch :default _ :invalid)))})
-      (catch :default _ {:success false}))
+    (assoc
+      (try
+        (let [raw (.getItem js/localStorage model/storage-key)]
+          {:success true :value (when raw
+                                 (try (js->clj (js/JSON.parse raw) :keywordize-keys true)
+                                      (catch :default _ :invalid)))})
+        (catch :default _ {:success false}))
+      :fragment (.-hash js/location))
+
+    :url/fx.clear-plan
+    ;; Consume the snapshot so refreshing after an edit keeps the newer local plan.
+    (when (= (first args) (.-hash js/location))
+      (.replaceState js/history nil "" (str (.-pathname js/location) (.-search js/location))))
 
     :storage/fx.save
     (try (.setItem js/localStorage model/storage-key
@@ -828,6 +876,7 @@
       (.addEventListener js/document "keydown" #(preview-key! %))
       (.addEventListener js/window "scroll" #(dismiss-preview! %) #js {:passive true})
       (.addEventListener js/window "resize" #(dismiss-preview! %))
+      (.addEventListener js/window "hashchange" #(dispatch! [[:share/ax.load]]))
       true))
 
 (defn init! []
