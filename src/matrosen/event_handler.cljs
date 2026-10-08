@@ -18,6 +18,7 @@
         (= :event/target.value value) (some-> replicant-data :replicant/js-event .-target .-value)
         (= :event/detail value) (some-> replicant-data :replicant/js-event .-detail)
         (= :preview/anchor value) (preview-anchor replicant-data)
+        (= :location/hash value) (.-hash js/location)
         (and (vector? value) (= :db/get (first value))) (get state (second value))
         :else value))
     action))

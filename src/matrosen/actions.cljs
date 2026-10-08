@@ -1,5 +1,6 @@
 (ns matrosen.actions
-  (:require [matrosen.model :as model]))
+  (:require [clojure.string :as str]
+            [matrosen.model :as model]))
 
 ;; Geometry arrives as plain event data; preview actions never read the DOM.
 (defn preview-position [{:keys [left top bottom viewport-width viewport-height]}]
@@ -36,6 +37,15 @@
                           (if (and (model/valid-settings? value) (model/valid-rows? value))
                             "Sparar…" "Ogiltiga värden sparas inte")))}
     (save-recipe value)))
+
+(defn reset-order
+  "Restores the starting order and drops a shared plan from the address."
+  [db fragment]
+  (let [order (model/default-order)]
+    (cond-> (-> (change-order db order nil)
+                (assoc-in [:uf/db :ui :preview] nil))
+      (and (string? fragment) (str/starts-with? fragment "#plan="))
+      (update :uf/fxs (fnil conj []) [:url/fx.clear-plan fragment]))))
 
 (defn handle-action [db [action & args]]
   (case action
@@ -107,6 +117,9 @@
     (let [order (:order db)]
       (when (and (model/valid-settings? order) (model/valid-rows? order) (pos? (model/share-total order)))
         (change-order db (model/distribute order) "Beställningen är fördelad enligt procenten, avrundat till hela smörrebröd.")))
+
+    :order/ax.reset
+    (reset-order db (first args))
 
     :order/ax.add-gluten-free
     (let [id (first args) order (:order db)]

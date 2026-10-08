@@ -16,6 +16,7 @@
      :check [:path {:d "m5 12 4 4L19 6"}]
      :leaf [:g [:path {:d "M20 3C10 2 3 7 5 14c2 7 15 7 15-11Z"}] [:path {:d "m4 21 11-12"}]]
      :spread [:g [:path {:d "M4 6h16M4 12h16M4 18h16"}] [:path {:d "M8 4v4M16 10v4M11 16v4"}]]
+     :reset [:g [:path {:d "M4 12a8 8 0 1 0 2.2-5.6"}] [:path {:d "M4 4v5h5"}]]
      [:circle {:cx 12 :cy 12 :r 8}])])
 (defn dish-preview [{:keys [id position]}]
   (let [{:keys [name description base-id gluten-free?]} (menu-by-id id) photo (get photos/photos (or base-id id))]
@@ -118,6 +119,8 @@
       [:div.order-heading
        [:div.heading-line [:h2#order-title "Din beställning"] [:span.sort-count (str (count ids) " av " (count dishes) " sorter")]]
        [:div.order-actions
+        [:button.secondary {:on {:click [[:order/ax.reset :location/hash]]}}
+         (icon :reset) "Återställ"]
         [:button.secondary {:on {:click [[:order/ax.share]]} :disabled (not (matrosen.model/shareable? value))
                             :title "Kopiera en länk med alla antal, val och fördelningsprocent"}
          (icon :link) "Kopiera för delning"]
@@ -151,7 +154,7 @@
           (nil? desired) "Fyll i planeringen för att jämföra med målet"
           (zero? difference) (list (icon :check) "Beställningen matchar målet")
           (pos? difference) (str (format-number difference) " fler än målet på " (format-number desired))
-          :else (str (format-number (- difference)) " färre än målet på " (format-number desired))) ]
+          :else (str (format-number (- difference)) " färre än målet på " (format-number desired)))]
        [:span.saved (:saved ui)]]
       (when-let [text (:copy-text ui)]
         [:div.copy-fallback [:label {:for "copy-text"} (if (= :link (:copy-kind ui)) "Länk till din beställning" "Din beställning som text")]
