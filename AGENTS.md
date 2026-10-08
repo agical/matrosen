@@ -24,9 +24,9 @@ Load the matching skill before changing the layer the skill covers.
 
 ### Uniflow, in this repo
 
-Read `.cursor/skills/uniflow/SKILL.md` before changing actions, effects, enrichment, `dispatch!`, view event data, or the state shape. Async recipes are in `.cursor/skills/uniflow/references/async-patterns.md`.
+Read `.agents/skills/uniflow/SKILL.md` before changing actions, effects, enrichment, `dispatch!`, view event data, or the state shape. Async recipes are in `.agents/skills/uniflow/references/async-patterns.md`.
 
-The loop for this page is `src/matrosen/event_handler.cljs`. `.cursor/skills/uniflow/templates/uniflow-starter.cljs` is a minimal loop with the same keys, for reading when the shape is unclear.
+The loop for this page is `src/matrosen/event_handler.cljs`. `.agents/skills/uniflow/templates/uniflow-starter.cljs` is a minimal loop with the same keys, for reading when the shape is unclear.
 
 ### Clojure, Babashka, and Scittle
 
