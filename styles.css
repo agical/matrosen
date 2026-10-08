@@ -60,7 +60,6 @@ tbody tr:last-child td,tbody tr:last-child th{border-bottom:0}
 tbody tr[data-has-variant=true] > td,tbody tr[data-has-variant=true] > th{border-bottom:0}
 tbody th{font-weight:400;padding-left:0}
 tbody td:first-child{padding:0}
-tbody tr:hover{background:oklch(97.5% .009 258)}
 .toggle-label{display:flex;align-items:center;justify-content:center;min-width:44px;min-height:52px;cursor:pointer}
 input[type=checkbox]{accent-color:var(--ink);width:19px;height:19px;cursor:pointer;margin:0}
 .dish-title{display:flex;align-items:center;gap:var(--space-sm);flex-wrap:wrap;font-size:15px;font-weight:600;line-height:1.25}
@@ -97,7 +96,7 @@ input[type=checkbox]{accent-color:var(--ink);width:19px;height:19px;cursor:point
 .no-veg{color:var(--muted);font-weight:400}
 .excluded .dish-title{color:var(--muted);font-weight:400}
 .excluded .dish-description{color:var(--muted)}
-.excluded{background:oklch(96% .007 258)}
+.excluded{background:var(--paper)}
 .excluded .vego-tag{background:var(--soft);color:var(--muted)}
 tfoot th,tfoot td{position:sticky;bottom:0;background:var(--ink);color:var(--surface);border-top:1px solid var(--ink);padding:14px 16px;vertical-align:top;z-index:1}
 tfoot th{font-size:15px;border-bottom-left-radius:5px;padding-left:22px}
