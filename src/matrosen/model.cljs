@@ -31,7 +31,8 @@
   (str name (when gluten-free? " (glutenfri)")))
 (def storage-key "matrosen.order.v1")
 
-;; Pure calculations: the target never overwrites the actual order on its own.
+;; Guests and breads per person apply the saved shares to the new target.
+;; A row edit keeps that row and splits the remainder. Rounding leaves the shares as they are.
 (defn number-value [value]
   (when-not (or (nil? value) (= "" value))
     (let [n (js/Number value)] (when (js/Number.isFinite n) n))))
@@ -118,10 +119,19 @@
             peers)))
 (defn edit-order [order path value]
   (let [edited (assoc-in order path value)]
-    (if (and (= :rows (first path))
-             (get-in edited [:rows (second path) :enabled?])
-             (valid-settings? edited) (valid-rows? edited))
+    (cond
+      (and (= :rows (first path))
+           (get-in edited [:rows (second path) :enabled?])
+           (valid-settings? edited)
+           (valid-rows? edited))
       (rebalance-row edited (second path))
+
+      (and (#{:guests :per-person} (first path))
+           (valid-settings? edited)
+           (valid-rows? edited))
+      (distribute edited)
+
+      :else
       edited)))
 (defn add-gluten-free-row [order id]
   (let [dish (menu-by-id id) new-id (gluten-free-id id)]

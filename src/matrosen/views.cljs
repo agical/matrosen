@@ -1,7 +1,6 @@
 (ns matrosen.views
   (:require [matrosen.photos :as photos]
-            [matrosen.model :refer [menu menu-by-id order-menu dish-label gluten-free-id menu-url restaurant-url number-value valid-number? valid-settings?
-                                   valid-rows? quantity totals target active-ids share-total format-number]]))
+            [matrosen.model :refer [menu menu-by-id order-menu dish-label gluten-free-id menu-url restaurant-url valid-number? valid-settings? valid-rows? quantity totals target active-ids share-total format-number]]))
 
 ;; Presentation reads the same calculations used by the order actions.
 (defn icon [kind]
@@ -15,7 +14,6 @@
      :link [:g [:path {:d "m10 13 4-4M8 16l-1 1a4 4 0 0 1-6-6l4-4a4 4 0 0 1 6 0M16 8l1-1a4 4 0 0 1 6 6l-4 4a4 4 0 0 1-6 0"}]]
      :check [:path {:d "m5 12 4 4L19 6"}]
      :leaf [:g [:path {:d "M20 3C10 2 3 7 5 14c2 7 15 7 15-11Z"}] [:path {:d "m4 21 11-12"}]]
-     :spread [:g [:path {:d "M4 6h16M4 12h16M4 18h16"}] [:path {:d "M8 4v4M16 10v4M11 16v4"}]]
      :reset [:g [:path {:d "M4 12a8 8 0 1 0 2.2-5.6"}] [:path {:d "M4 4v5h5"}]]
      [:circle {:cx 12 :cy 12 :r 8}])])
 (defn dish-preview [{:keys [id position]}]
@@ -80,9 +78,8 @@
 (defn app [{:keys [order ui]}]
   (let [value order {:keys [total vego gluten-free]} (totals value) desired (target value)
         dishes (order-menu value)
-        guests (number-value (:guests value)) ids (active-ids value)
+        ids (active-ids value)
         settings-valid? (valid-settings? value) rows-valid? (valid-rows? value)
-        actual (when (and guests (pos? guests)) (/ total guests))
         difference (when desired (- total desired))]
     [:main.shell
      [:header.masthead
@@ -97,19 +94,14 @@
                                    :on {:focus [[:ui/ax.select-input "guests"]]
                                         :input [[:order/ax.edit [:guests] :event/target.value]]}}]]
        [:div.field [:label {:for "per-person"} "Smörrebröd per person"]
-        [:div.portion-line
-         [:input#per-person.plan-input {:type "number" :inputmode "decimal" :min 0.5 :max 100 :step "any"
-                                        :value (:per-person value) :aria-invalid (not (valid-number? (:per-person value) 0.5 100 false))
-                                        :aria-describedby (if settings-valid? "target-note" "settings-error")
-                                        :on {:focus [[:ui/ax.select-input "per-person"]]
-                                             :input [[:order/ax.edit [:per-person] :event/target.value]]}}]
-         [:div.actual [:strong#actual-per-person (if (and actual rows-valid?) (format-number actual) "–")] "i beställningen"]]]
-       [:button.primary {:disabled (or (not settings-valid?) (not rows-valid?) (not (pos? (share-total value))))
-                         :on {:click [[:order/ax.distribute]]}}
-        (icon :spread) "Fördela"]]
+        [:input#per-person.plan-input {:type "number" :inputmode "decimal" :min 0.5 :max 100 :step "any"
+                                       :value (:per-person value) :aria-invalid (not (valid-number? (:per-person value) 0.5 100 false))
+                                       :aria-describedby (if settings-valid? "target-note" "settings-error")
+                                       :on {:focus [[:ui/ax.select-input "per-person"]]
+                                            :input [[:order/ax.edit [:per-person] :event/target.value]]}}]]]
       [:p#target-note.target-note
        (if desired (list "Mål: " [:strong (str (format-number desired) " smörrebröd")] ". ") "")
-       "Ändrar du en rad fördelas resten på övriga sorter så att målet nås. Procenten uppdateras och sparas. Fördela använder den sparade fördelningen."]
+       "Ändrar du gäster eller smörrebröd per person fördelas beställningen enligt den sparade fördelningen. Ändrar du en rad hålls det antalet fast och resten fördelas."]
       (when-not settings-valid? [:p#settings-error.error "Ange 1–10 000 hela gäster och 0,5–100 smörrebröd per person."])
       (cond
         (empty? ids) [:p.error "Aktivera minst en sort för att fördela."]

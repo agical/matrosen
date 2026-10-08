@@ -113,11 +113,6 @@
                  (<= 0 n (model/target order)))
         (change-order db (model/edit-order order [:rows id :qty] n) nil)))
 
-    :order/ax.distribute
-    (let [order (:order db)]
-      (when (and (model/valid-settings? order) (model/valid-rows? order) (pos? (model/share-total order)))
-        (change-order db (model/distribute order) "Beställningen är fördelad enligt procenten, avrundat till hela smörrebröd.")))
-
     :order/ax.reset
     (reset-order db (first args))
 
