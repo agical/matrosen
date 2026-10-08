@@ -46,7 +46,9 @@ From the repo root, `bb dev` serves the directory at <http://127.0.0.1:8080/>. `
 
 On localhost the page loads `scittle.nrepl.js`. The WebSocket host is `localhost`. The port is the `nrepl` query parameter, or `1340`.
 
-Connect Calva's Scittle websocket, then load a changed file into that session. Load `event_handler.cljs` after a view or action change. The file calls `init!`, which rebinds Replicant's dispatch. When `:initialized?` is already true, `:app/ax.initialize` keeps the current order and the loop renders that order.
+Calva opens that WebSocket itself. Connect Calva's Scittle websocket, then load a changed file into that session. Load `event_handler.cljs` after a view or action change. The file calls `init!`, which rebinds Replicant's dispatch. When `:initialized?` is already true, `:app/ax.initialize` keeps the current order and the loop renders that order.
+
+Other editors speak nREPL. `bb browser-nrepl` relays nREPL port `1339` to the page WebSocket on `1340`. `--nrepl-port` and `--websocket-port` select others. The page's `nrepl` query parameter has to match the WebSocket port.
 
 Develop the change in the REPL, then put the verified form in the file. The Clojure skill's `references/repl-workflows.md` is the habit. The script order in `index.html` is the order for a full load.
 

@@ -1,8 +1,18 @@
 {:paths ["scripts"]
+ :deps {io.github.babashka/sci.nrepl
+        {:git/url "https://github.com/babashka/sci.nrepl"
+         :git/sha "80ec956af5e6610b040089ba62eecb5d223e9e76"}}
  :tasks
  {dev {:doc "Serve the site for local development [--port PORT]"
        :requires ([babashka.cli :as cli]
                   [dev-server])
        :task (dev-server/start!
               (cli/parse-opts *command-line-args*
-                              dev-server/cli-spec))}}}
+                              dev-server/cli-spec))}
+
+  browser-nrepl {:doc "Relay nREPL to the page WebSocket for editors other than Calva [--nrepl-port PORT] [--websocket-port PORT]"
+                 :requires ([babashka.cli :as cli]
+                            [browser-nrepl])
+                 :task (browser-nrepl/start!
+                        (cli/parse-opts *command-line-args*
+                                        browser-nrepl/cli-spec))}}}

@@ -35,7 +35,7 @@
       const status = document.getElementById('load-status');
       if (status) status.textContent = 'Sidan kunde inte starta. Kontrollera internetanslutningen och ladda om.';
     }, 15000);
-    // Calva supplies the bridge. A different WebSocket port can be set with ?nrepl=1340.
+    // Calva opens this WebSocket itself. Other nREPL editors use `bb browser-nrepl`, which listens here. ?nrepl= sets the port.
     var SCITTLE_NREPL_WEBSOCKET_HOST = 'localhost';
     var SCITTLE_NREPL_WEBSOCKET_PORT = Number(new URLSearchParams(location.search).get('nrepl') || 1340);
     if (['localhost', '127.0.0.1', ''].includes(location.hostname)) {
