@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f5f4ee">
   <meta name="description" content="Planera smörrebröd till ditt event. Fördela, justera och kopiera din beställning.">
-  <title>Matrosen · Smörrebrödsplaneraren</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23233650'/%3E%3Ctext x='32' y='47' text-anchor='middle' font-family='Georgia' font-size='46' fill='%23f5f4ee'%3EM%3C/text%3E%3C/svg%3E">
+  <title>Smörrebrödsplaneraren</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23233650'/%3E%3Ctext x='32' y='47' text-anchor='middle' font-family='Georgia' font-size='46' fill='%23f5f4ee'%3ES%3C/text%3E%3C/svg%3E">
   <style>
     @font-face{font-family:'Bodoni Moda';font-style:normal;font-weight:500;font-display:swap;src:url('https://fonts.gstatic.com/s/bodonimoda/v28/aFT67PxzY382XsXX63LUYL6GYFcan6NJrKp-VPjfJMShrpsGFUt8oXzawIA.ttf') format('truetype')}
     @font-face{font-family:Figtree;font-style:normal;font-weight:400;font-display:swap;src:url('https://fonts.gstatic.com/s/figtree/v9/_Xmz-HUzqDCFdgfMsYiV_F7wfS-Bs_d_QF5e.ttf') format('truetype')}
@@ -31,7 +31,7 @@
     a:hover{text-decoration-thickness:2px}
     :focus-visible{outline:3px solid oklch(54% .15 260);outline-offset:4px}
     .shell{max-width:1000px;margin:auto;padding:40px 40px 32px}
-    .masthead{display:flex;align-items:center;justify-content:space-between;gap:var(--space-xl);padding-bottom:var(--space-xl);border-bottom:1px solid var(--ink)}
+    .masthead{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:var(--space-xl);padding-bottom:var(--space-xl);border-bottom:1px solid var(--ink)}
     h1{font-family:'Bodoni Moda',serif;font-size:42px;font-weight:500;line-height:1.12;letter-spacing:-1.5px;margin:0}
     .subtitle{font-size:14px;color:var(--muted);margin:4px 0 0}
     .event-link{display:inline-flex;align-items:center;gap:6px;font-size:14px;min-height:44px;white-space:nowrap}
@@ -137,7 +137,7 @@
     @media(min-width:760px){.planner-fields{gap:32px}.planner .primary{margin-left:auto}}
     @media(max-width:640px){
       .shell{padding:24px 16px}.masthead{gap:12px;padding-bottom:20px}
-      h1{font-size:34px}.subtitle{font-size:12px}.event-link{font-size:12px}
+      h1{font-size:clamp(24px,6vw,34px)}.subtitle{font-size:12px}.event-link{font-size:12px}
       .planner{padding:20px 0 24px}.planner-fields{column-gap:24px;row-gap:16px}.planner .primary{width:100%}
       .order-heading{align-items:flex-start;gap:8px}.heading-line{display:block}.sort-count{display:block;margin-top:4px}
       .order-actions{gap:0}.secondary{padding:9px 10px}.text-button{padding:8px}.undo-label{display:none}
@@ -165,7 +165,7 @@
   <script src="https://cdn.jsdelivr.net/npm/scittle@0.8.33/dist/scittle.replicant.js"></script>
 </head>
 <body>
-  <div id="app"><div class="loading"><h1>Matrosen</h1><p id="load-status">Laddar din beställning…</p><noscript>Aktivera JavaScript för att använda beställningsverktyget.</noscript></div></div>
+  <div id="app"><div class="loading"><h1>Smörrebrödsplaneraren</h1><p id="load-status">Laddar din beställning…</p><noscript>Aktivera JavaScript för att använda beställningsverktyget.</noscript></div></div>
   <script>
     window.setTimeout(function () {
       const status = document.getElementById('load-status');
@@ -226,7 +226,7 @@
 
 ;; Menu data and identity stay separate from the editable order.
 (def menu-url "https://static.thatsup.website/37/71554/Matrosen_Meny_20250918.pdf?v=1762507306")
-(def event-url "https://www.meetup.com/sthlm-clj/")
+(def restaurant-url "https://matrosensmorrebrod.com/")
 (def menu
   [{:id :avokado :name "Avokado" :description "Ägg · majonnäs" :vego? true}
    {:id :brie :name "Brie" :description "Marmelad · pumpafrön" :vego? true}
@@ -363,7 +363,7 @@
 (defn order-text [value]
   (let [{:keys [total vego]} (totals value)]
     (str/join "\n"
-      (concat ["Matrosen · Smörrebrödsplaneraren" ""]
+      (concat ["Smörrebrödsplaneraren" ""]
               (keep (fn [{:keys [id name vego?]}]
                       (let [row (get-in value [:rows id]) n (quantity row)]
                         (when (and (:enabled? row) (pos? n))
@@ -375,7 +375,7 @@
 
 (ns matrosen.views
   (:require [matrosen.photos :as photos]
-            [matrosen.model :refer [menu menu-by-id menu-url event-url number-value valid-number? valid-settings?
+            [matrosen.model :refer [menu menu-by-id menu-url restaurant-url number-value valid-number? valid-settings?
                                    valid-rows? quantity totals target active-ids share-total format-number]]))
 
 ;; Presentation reads the same calculations used by the order actions.
@@ -449,8 +449,8 @@
         difference (when desired (- total desired))]
     [:main.shell
      [:header.masthead
-      [:div [:h1 "Matrosen"] [:p.subtitle "Smörrebrödsplaneraren"]]
-      [:a.event-link {:href event-url :target "_blank" :rel "noreferrer"} "sthlm.clj" (icon :arrow)]]
+      [:div [:h1 "Smörrebrödsplaneraren"] [:p.subtitle "Ordna mat till eventet från Matrosen Smörrebröd"]]
+      [:a.event-link {:href restaurant-url :target "_blank" :rel "noreferrer"} "Matrosen Smörrebröd" (icon :arrow)]]
      [:section.planner {:aria-label "Planera antal"}
       [:div.planner-fields
        [:div.field [:label {:for "guests"} "Antal gäster"]
