@@ -131,13 +131,19 @@
         [:thead [:tr [:th {:scope "col"} "Med"] [:th {:scope "col"} "Smörrebröd"]
                  [:th.numeric {:scope "col"} "Antal"] [:th.numeric {:scope "col"} "Vego*"]]]
         [:tbody (for [dish dishes] (menu-row value (:preview ui) dish))]
-        [:tfoot [:tr [:th {:scope "row" :colspan 2} "Totalt" [:span.total-sub "smörrebröd"]]
-                 [:td#total-count.numeric (if rows-valid? total "–")]
-                 [:td#vego-count.numeric (if rows-valid? vego "–")
-                  [:span.total-sub (if (and rows-valid? (pos? total)) (str (js/Math.round (* 100 (/ vego total))) " % vego") "vego")]]]]]]
+        [:tfoot
+         [:tr
+          [:th {:scope "row" :colspan 2}
+           [:div.footer-overview
+            [:div.footer-label "Totalt" [:span.total-sub "smörrebröd"]]
+            [:div.footer-gluten
+             [:span#gluten-free-count.footer-number (if rows-valid? gluten-free "–")]
+             [:span.total-sub "glutenfria"]]]]
+          [:td.total-quantity
+           [:span#total-count.footer-number (if rows-valid? total "–")]]
+          [:td#vego-count.numeric (if rows-valid? vego "–")
+           [:span.total-sub (if (and rows-valid? (pos? total)) (str (js/Math.round (* 100 (/ vego total))) " % vego") "vego")]]]]]]
       (when-not rows-valid? [:p#quantity-error.error "Ange ett helt antal från 0 i de markerade raderna. Summan visas när alla antal är giltiga."])
-      (when (some :gluten-free? dishes)
-        [:p#gluten-free-count.target-note (str "Glutenfria: " (if rows-valid? gluten-free "–") " smörrebröd")])
       [:div.balance
        [:span.balance-label {:class (if (and rows-valid? (= 0 difference)) "balanced" "unbalanced")}
         (cond
