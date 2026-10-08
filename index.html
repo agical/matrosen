@@ -290,6 +290,7 @@
     {}))
 (defn share-total [order]
   (reduce + 0 (map #(get-in order [:rows % :share] 0) (active-ids order))))
+;; Only used to migrate older saved orders that have no independent shares.
 (defn update-shares [order]
   (if (valid-rows? order)
     (let [total (:total (totals order))]
@@ -326,12 +327,23 @@
         chosen (if (seq peers) (min n (quantity (get-in order [:rows id]))) n)
         remainder (- n chosen)
         peer-order (assoc-in order [:rows id :enabled?] false)
-        allocation (if (pos? (share-total peer-order))
+        peer-total (share-total peer-order)
+        allocation (if (pos? peer-total)
                      (weighted-shares peer-order remainder)
                      (shares remainder peers))]
-    (-> (reduce (fn [result peer] (assoc-in result [:rows peer :qty] (get allocation peer 0)))
-                (assoc-in order [:rows id :qty] chosen) peers)
-        update-shares)))
+    ;; Keep fractional shares through every edit. Feeding rounded quantities back
+    ;; into shares makes alternating increases steal the same bread back and forth.
+    (reduce (fn [result peer]
+              (let [relative-share (if (pos? peer-total)
+                                     (/ (get-in order [:rows peer :share]) peer-total)
+                                     (/ 1 (count peers)))]
+                (-> result
+                    (assoc-in [:rows peer :qty] (get allocation peer 0))
+                    (assoc-in [:rows peer :share] (* (/ remainder n) relative-share)))))
+            (-> order
+                (assoc-in [:rows id :qty] chosen)
+                (assoc-in [:rows id :share] (/ chosen n)))
+            peers)))
 (defn edit-order [order path value]
   (let [edited (assoc-in order path value)]
     (if (and (= :rows (first path))
