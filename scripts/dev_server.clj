@@ -19,7 +19,8 @@
    "jpeg" "image/jpeg"
    "png" "image/png"
    "svg" "image/svg+xml"
-   "ico" "image/x-icon"})
+   "ico" "image/x-icon"
+   "ttf" "font/ttf"})
 
 (defn decode-path
   "Percent-decoded request path, or nil when the encoding is broken."

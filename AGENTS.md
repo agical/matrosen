@@ -2,7 +2,7 @@
 
 An event host opens this page to plan a smörrebröd order from Matrosen. The host sets a target count, adjusts dishes, and copies or shares the order. The interface is Swedish. The design context is `.impeccable.md`. PEZ writes `README.md`.
 
-The page is one Scittle program. `index.html` loads Scittle and Replicant from the CDN, then the program in this order:
+The page is one Scittle program. `index.html` loads Scittle and Replicant from `vendor/scittle/0.8.33/`, then the program in this order:
 
 1. `src/matrosen/photos.cljs` — photo map
 2. `src/matrosen/model.cljs` — menu, validation, quantities, share text
