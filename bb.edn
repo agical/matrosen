@@ -1,0 +1,8 @@
+{:paths ["scripts"]
+ :tasks
+ {dev {:doc "Serve the site for local development [--port PORT]"
+       :requires ([babashka.cli :as cli]
+                  [dev-server])
+       :task (dev-server/start!
+              (cli/parse-opts *command-line-args*
+                              dev-server/cli-spec))}}}
