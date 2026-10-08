@@ -90,6 +90,7 @@
     thead .numeric{padding-right:24px}
     tbody td,tbody th{border-bottom:1px solid var(--line);padding:9px 16px;height:59px}
     tbody tr:last-child td,tbody tr:last-child th{border-bottom:0}
+    tbody tr[data-has-variant=true] > td,tbody tr[data-has-variant=true] > th{border-bottom:0}
     tbody th{font-weight:400;padding-left:0}
     tbody td:first-child{padding:0}
     tbody tr:hover{background:oklch(97.5% .009 258)}
@@ -113,12 +114,17 @@
     .preview-close:hover{background:var(--soft)}
     .vego-tag{color:var(--green);background:var(--green-soft);font-size:10px;font-weight:600;letter-spacing:.25px;display:inline-flex;align-items:center;gap:3px;padding:2px 6px;border-radius:3px;white-space:nowrap}
     .vego-tag svg{width:11px;height:11px}
+    .gluten-tag{color:var(--ink);background:var(--soft);font-size:10px;font-weight:600;padding:2px 6px;border-radius:3px;white-space:nowrap}
+    .row-details{display:flex;align-items:center;flex-wrap:wrap;gap:2px 12px;margin-top:5px}
+    .split-button{border:0;background:transparent;padding:4px 0;min-height:32px;font-size:11px;text-decoration:underline;text-underline-offset:3px}
+    .split-button:hover:not(:disabled){color:var(--green)}
+    @media(pointer:coarse){.split-button{min-height:44px}}
     .qty-cell{text-align:right}
     .qty-control{display:flex;align-items:center;justify-content:flex-end;gap:4px}
     .qty-input{width:60px;min-height:38px;padding:6px;text-align:center;font-size:16px}
     .qty-step{display:inline-flex;align-items:center;justify-content:center;width:38px;height:44px;flex:none;padding:0;border:1px solid var(--line);border-radius:5px;background:transparent;font-size:22px;line-height:1}
     .qty-step:hover:not(:disabled){background:var(--soft);border-color:var(--muted)}
-    .row-share{display:block;margin-top:5px;font-size:11px;color:var(--muted);font-weight:400}
+    .row-share{display:block;font-size:11px;color:var(--muted);font-weight:400}
     .qty-input:disabled{background:transparent;border-color:transparent;color:var(--muted)}
     .veg-number{color:var(--green);font-weight:600;padding-right:24px}
     .no-veg{color:var(--muted);font-weight:400}
@@ -171,7 +177,7 @@
     }
     @media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
     @media print{
-      body{background:white}.shell{padding:0;max-width:none}.planner,.order-actions,.event-link,.saved,.footer,.notice,.copy-fallback,.dish-preview,.dish-trigger,.qty-step{display:none!important}
+      body{background:white}.shell{padding:0;max-width:none}.planner,.order-actions,.event-link,.saved,.footer,.notice,.copy-fallback,.dish-preview,.dish-trigger,.qty-step,.split-button{display:none!important}
       .masthead{margin-bottom:24px}.excluded{display:none}tfoot th,tfoot td{position:static;background:var(--soft);color:var(--ink)}
       tfoot td:last-child{color:var(--green)}.qty-input{border:0!important;background:transparent!important}.table-wrap{break-inside:avoid}
     }
@@ -257,7 +263,16 @@
    {:id :currykyckling :name "Currykyckling" :description "Selleri · bacon · rödlök" :vego? false}
    {:id :gamle-ole :name "Gamle Ole" :description "Skygelé · mörk rom" :vego? false}
    {:id :lun-postej :name "Lun postej" :description "Varm pastej" :vego? false :initially-off? true}])
-(def menu-by-id (into {} (map (juxt :id identity) menu)))
+(defn gluten-free-id [id] (keyword (str (name id) "-glutenfri")))
+(def all-menu
+  (vec (mapcat (fn [dish]
+                 [dish (assoc dish :id (gluten-free-id (:id dish))
+                                   :base-id (:id dish) :gluten-free? true)]) menu)))
+(def menu-by-id (into {} (map (juxt :id identity) all-menu)))
+(defn order-menu [order]
+  (filterv #(contains? (:rows order) (:id %)) all-menu))
+(defn dish-label [{:keys [name gluten-free?]}]
+  (str name (when gluten-free? " (glutenfri)")))
 (def storage-key "matrosen.order.v1")
 
 ;; Pure calculations: the target never overwrites the actual order on its own.
@@ -277,12 +292,13 @@
   (when (valid-settings? order)
     (js/Math.ceil (- (* (number-value (:guests order)) (number-value (:per-person order))) 1e-9))))
 (defn active-ids [order]
-  (mapv :id (filter #(get-in order [:rows (:id %) :enabled?]) menu)))
+  (mapv :id (filter #(get-in order [:rows (:id %) :enabled?]) (order-menu order))))
 (defn totals [order]
-  (reduce (fn [result {:keys [id vego?]}]
+  (reduce (fn [result {:keys [id vego? gluten-free?]}]
             (let [row (get-in order [:rows id]) n (if (:enabled? row) (quantity row) 0)]
-              (-> result (update :total + n) (update :vego + (if vego? n 0)))))
-          {:total 0 :vego 0} menu))
+              (-> result (update :total + n) (update :vego + (if vego? n 0))
+                  (update :gluten-free + (if gluten-free? n 0)))))
+          {:total 0 :vego 0 :gluten-free 0} (order-menu order)))
 (defn shares [n ids]
   (if (seq ids)
     (let [base (quot n (count ids)) extra (mod n (count ids))]
@@ -351,6 +367,12 @@
              (valid-settings? edited) (valid-rows? edited))
       (rebalance-row edited (second path))
       edited)))
+(defn add-gluten-free-row [order id]
+  (let [dish (menu-by-id id) new-id (gluten-free-id id)]
+    (if (and dish (not (:gluten-free? dish))
+             (get-in order [:rows id :enabled?]) (not (contains? (:rows order) new-id)))
+      (assoc-in order [:rows new-id] {:enabled? true :qty 0 :share 0})
+      order)))
 (defn toggle-row [order id]
   (let [row (get-in order [:rows id])
         peers (filterv #(and (not= id %) (= (:vego? (menu-by-id id)) (:vego? (menu-by-id %))))
@@ -373,7 +395,8 @@
                                            :share (if initially-off? 0 (/ 1 active-count))}]) menu))})))
 (defn valid-stored-order? [order]
   (and (map? order) (valid-settings? order) (map? (:rows order))
-       (= (set (keys (:rows order))) (set (map :id menu)))
+       (every? #(contains? (:rows order) (:id %)) menu)
+       (every? #(contains? menu-by-id %) (keys (:rows order)))
        (every? (fn [[_ row]] (and (map? row) (boolean? (:enabled? row))
                                  (valid-number? (:qty row) 0 1000000 true)
                                  (or (:enabled? row) (zero? (quantity row))))) (:rows order))))
@@ -393,20 +416,20 @@
   (str site-url "#plan="
        (js/encodeURIComponent
          (js/JSON.stringify
-           (clj->js {:v 1 :guests (:guests order) :per-person (:per-person order)
+           (clj->js {:v 2 :guests (:guests order) :per-person (:per-person order)
                      :rows (mapv (fn [{:keys [id]}]
                                    (let [{:keys [enabled? qty share]} (get-in order [:rows id])]
-                                     [(name id) enabled? qty share])) menu)})))))
+                                     [(name id) enabled? qty share])) (order-menu order))})))))
 (defn read-shared-plan [fragment]
   (when (str/starts-with? fragment "#plan=")
     (try
       (when (> (count fragment) 12000) (throw (js/Error. "Oversized shared plan")))
       (let [{:keys [v guests per-person rows]}
             (js->clj (js/JSON.parse (js/decodeURIComponent (subs fragment 6))) :keywordize-keys true)
-            known-ids (into {} (map (fn [{:keys [id]}] [(name id) id]) menu))]
-        (if (and (= 1 v) (vector? rows) (= (count menu) (count rows))
+            known-ids (into {} (map (fn [{:keys [id]}] [(name id) id]) (if (= 1 v) menu all-menu)))]
+        (if (and (#{1 2} v) (vector? rows) (<= (count menu) (count rows) (count known-ids))
                  (every? #(and (vector? %) (= 4 (count %)) (contains? known-ids (first %))) rows)
-                 (= (set (keys known-ids)) (set (map first rows))))
+                 (= (count rows) (count (set (map first rows)))))
           (let [order {:guests guests :per-person per-person
                        :rows (into {} (map (fn [[id enabled? qty share]]
                                             [(known-ids id) {:enabled? enabled? :qty qty :share share}]) rows))}]
@@ -417,21 +440,22 @@
 (defn format-number [n]
   (.toLocaleString n "sv-SE" #js {:maximumFractionDigits 2}))
 (defn order-text [value]
-  (let [{:keys [total vego]} (totals value)]
+  (let [{:keys [total vego gluten-free]} (totals value)]
     (str/join "\n"
       (concat ["Smörrebrödsplaneraren" ""]
-              (keep (fn [{:keys [id name vego?]}]
+              (keep (fn [{:keys [id vego?] :as dish}]
                       (let [row (get-in value [:rows id]) n (quantity row)]
                         (when (and (:enabled? row) (pos? n))
-                          (str n " × " name (when vego? " (vego*)"))))) menu)
+                          (str n " × " (dish-label dish) (when vego? " (vego*)"))))) (order-menu value))
               ["" (str "Totalt: " total " smörrebröd, varav " vego " vego*.")
+               (str "Glutenfria: " gluten-free " smörrebröd.")
                (str "Antal gäster: " (format-number (number-value (:guests value))))
                (str "Smörrebröd per person: " (format-number (/ total (number-value (:guests value)))))
                "" "*Vego enligt menybeskrivningarna, inklusive ägg och mjölk. Bekräfta med Matrosen."]))))
 
 (ns matrosen.views
   (:require [matrosen.photos :as photos]
-            [matrosen.model :refer [menu menu-by-id menu-url restaurant-url number-value valid-number? valid-settings?
+            [matrosen.model :refer [menu menu-by-id order-menu dish-label gluten-free-id menu-url restaurant-url number-value valid-number? valid-settings?
                                    valid-rows? quantity totals target active-ids share-total format-number]]))
 
 ;; Presentation reads the same calculations used by the order actions.
@@ -449,7 +473,7 @@
      :spread [:g [:path {:d "M4 6h16M4 12h16M4 18h16"}] [:path {:d "M8 4v4M16 10v4M11 16v4"}]]
      [:circle {:cx 12 :cy 12 :r 8}])])
 (defn dish-preview [{:keys [id position]}]
-  (let [{:keys [name description]} (menu-by-id id) photo (get photos/photos id)]
+  (let [{:keys [name description base-id gluten-free?]} (menu-by-id id) photo (get photos/photos (or base-id id))]
     [:section#dish-preview.dish-preview
      {:role "dialog" :aria-modal false :aria-labelledby "preview-title" :style position}
      [:button#preview-close.preview-close {:type "button" :aria-label "Stäng förhandsvisning"
@@ -458,47 +482,58 @@
        [:img.preview-photo {:src (:src photo) :alt (str name " från Matrosen") :width 640 :height 360}]
        [:div.preview-empty (icon :photo) "Bild saknas"])
      [:div.preview-caption [:h3#preview-title name] [:p description]
+      (when gluten-free? [:p "Bilden visar originalet."])
       [:a {:href (or (:source photo) "https://matrosensmorrebrod.com/meny") :target "_blank" :rel "noreferrer"}
        (if photo (str "Foto: " (:credit photo)) "Se Matrosens meny") (icon :arrow)]]]))
-(defn menu-row [value preview {:keys [id name description vego?]}]
+(defn menu-row [value preview {:keys [id name description vego? gluten-free?] :as dish}]
   (let [row (get-in value [:rows id]) valid? (valid-number? (:qty row) 0 1000000 true)
+        label (dish-label dish)
         desired (target value)
         editable? (and (:enabled? row) desired (> (count (active-ids value)) 1))
         step-enabled? (and editable? (valid-rows? value))
         field-id (str "qty-" (cljs.core/name id))]
-    [:tr {:replicant/key id :class (when-not (:enabled? row) "excluded")}
+    [:tr {:replicant/key id :class (when-not (:enabled? row) "excluded")
+          :data-has-variant (and (not gluten-free?) (contains? (:rows value) (gluten-free-id id)))}
      [:td [:label.toggle-label
            [:input {:id (str "include-" (cljs.core/name id)) :type "checkbox" :checked (:enabled? row) :on {:change [[:order/ax.toggle id]]}
-                    :aria-label (str "Ta med " name)}]]]
+                    :aria-label (str "Ta med " label)}]]]
      [:th {:scope "row"}
       [:div.dish-title [:span.dish-name name] (when vego? [:span.vego-tag (icon :leaf) "Vego*"])
+       (when gluten-free? [:span.gluten-tag "Glutenfri"])
        [:button.dish-trigger
-        {:id (str "preview-" (cljs.core/name id)) :type "button" :aria-label (str "Visa " name)
+        {:id (str "preview-" (cljs.core/name id)) :type "button" :aria-label (str "Visa " label)
          :aria-haspopup "dialog" :aria-expanded (= id (:id preview))
          :aria-controls (when (= id (:id preview)) "dish-preview")
          :on {:click [[:preview/ax.toggle id :preview/anchor :event/detail]]}}
         (icon :photo)]]
       [:span.dish-description description]
-      [:span.row-share {:id (str "share-" (cljs.core/name id))}
-       (str "Fördelning: " (format-number (* 100 (:share row))) " %")]]
+      [:div.row-details
+       [:span.row-share {:id (str "share-" (cljs.core/name id))}
+        (str "Fördelning: " (format-number (* 100 (:share row))) " %")]
+       (when (and (not gluten-free?) (not (contains? (:rows value) (gluten-free-id id))))
+         [:button.split-button {:type "button" :aria-label (str "Lägg till glutenfri rad för " name)
+                                :disabled (or (not (:enabled? row)) (not (valid-rows? value)))
+                                :on {:click [[:order/ax.add-gluten-free id]]}}
+          "+ Glutenfri"])]]
      [:td.qty-cell
       [:div.qty-control
-       [:button.qty-step {:type "button" :aria-label (str "Minska " name)
+       [:button.qty-step {:type "button" :aria-label (str "Minska " label)
                           :disabled (or (not step-enabled?) (zero? (quantity row)))
                           :on {:click [[:order/ax.step id -1]]}} "−"]
        [:input.qty-input {:id field-id :type "number" :inputmode "numeric" :min 0 :max (or desired 1000000) :step 1
-                         :aria-label (str "Antal " name) :aria-invalid (not valid?)
+                         :aria-label (str "Antal " label) :aria-invalid (not valid?)
                          :aria-describedby (when-not valid? "quantity-error")
                          :value (:qty row) :disabled (not editable?)
                          :on {:focus [[:ui/ax.select-input field-id]]
                               :input [[:order/ax.edit [:rows id :qty] :event/target.value]]}}]
-       [:button.qty-step {:type "button" :aria-label (str "Öka " name)
+       [:button.qty-step {:type "button" :aria-label (str "Öka " label)
                           :disabled (or (not step-enabled?) (and desired (>= (quantity row) desired)))
                           :on {:click [[:order/ax.step id 1]]}} "+"]]]
      [:td.numeric.veg-number {:class (when-not vego? "no-veg")}
       (if vego? (quantity row) [:span {:aria-label "0 vegetariska"} "–"])]]))
 (defn app [{:keys [order ui]}]
-  (let [value order {:keys [total vego]} (totals value) desired (target value)
+  (let [value order {:keys [total vego gluten-free]} (totals value) desired (target value)
+        dishes (order-menu value)
         guests (number-value (:guests value)) ids (active-ids value)
         settings-valid? (valid-settings? value) rows-valid? (valid-rows? value)
         actual (when (and guests (pos? guests)) (/ total guests))
@@ -536,7 +571,7 @@
         (zero? (share-total value)) [:p.error "Öka antalet på minst en rad för att skapa en fördelning."])]
      [:section {:aria-labelledby "order-title"}
       [:div.order-heading
-       [:div.heading-line [:h2#order-title "Din beställning"] [:span.sort-count (str (count ids) " av " (count menu) " sorter")]]
+       [:div.heading-line [:h2#order-title "Din beställning"] [:span.sort-count (str (count ids) " av " (count dishes) " sorter")]]
        [:div.order-actions
         [:button.secondary {:on {:click [[:order/ax.share]]} :disabled (not (matrosen.model/shareable? value))
                             :title "Kopiera en länk med alla antal, val och fördelningsprocent"}
@@ -550,12 +585,14 @@
         [:colgroup [:col.include-col] [:col] [:col.qty-col] [:col.veg-col]]
         [:thead [:tr [:th {:scope "col"} "Med"] [:th {:scope "col"} "Smörrebröd"]
                  [:th.numeric {:scope "col"} "Antal"] [:th.numeric {:scope "col"} "Vego*"]]]
-        [:tbody (for [dish menu] (menu-row value (:preview ui) dish))]
+        [:tbody (for [dish dishes] (menu-row value (:preview ui) dish))]
         [:tfoot [:tr [:th {:scope "row" :colspan 2} "Totalt" [:span.total-sub "smörrebröd"]]
                  [:td#total-count.numeric (if rows-valid? total "–")]
                  [:td#vego-count.numeric (if rows-valid? vego "–")
                   [:span.total-sub (if (and rows-valid? (pos? total)) (str (js/Math.round (* 100 (/ vego total))) " % vego") "vego")]]]]]]
       (when-not rows-valid? [:p#quantity-error.error "Ange ett helt antal från 0 i de markerade raderna. Summan visas när alla antal är giltiga."])
+      (when (some :gluten-free? dishes)
+        [:p#gluten-free-count.target-note (str "Glutenfria: " (if rows-valid? gluten-free "–") " smörrebröd")])
       [:div.balance
        [:span.balance-label {:class (if (and rows-valid? (= 0 difference)) "balanced" "unbalanced")}
         (cond
@@ -650,7 +687,7 @@
     (let [{:keys [success value fragment]} (first args)
           shared (model/read-shared-plan (or fragment ""))
           version (:version value)
-          valid? (and (#{1 2} version) (model/valid-stored-order? (:order value))
+          valid? (and (#{1 2 3} version) (model/valid-stored-order? (:order value))
                       (or (= 1 version) (model/valid-stored-shares? (:order value))))
           local (if (and (not (:initialized? db)) valid?)
                   (if (= 1 version) (model/update-shares (:order value)) (:order value)) (:order db))
@@ -694,6 +731,14 @@
     (let [order (:order db)]
       (when (and (model/valid-settings? order) (model/valid-rows? order) (pos? (model/share-total order)))
         (change-order db (model/distribute order) "Beställningen är fördelad enligt procenten, avrundat till hela smörrebröd.")))
+
+    :order/ax.add-gluten-free
+    (let [id (first args) order (:order db)]
+      (when (model/valid-rows? order)
+        (let [updated (model/add-gluten-free-row order id)]
+          (when (not= order updated)
+            (-> (change-order db updated "En glutenfri rad är tillagd med 0 och 0 %. Använd + för att ge den en andel.")
+                (update :uf/fxs (fnil conj []) [:dom/fx.focus (str "qty-" (name (model/gluten-free-id id)))]))))))
 
     :order/ax.toggle
     (let [id (first args) order (:order db)]
@@ -786,7 +831,7 @@
 
     :storage/fx.save
     (try (.setItem js/localStorage model/storage-key
-                   (js/JSON.stringify (clj->js {:version 2 :order (first args)})))
+                   (js/JSON.stringify (clj->js {:version 3 :order (first args)})))
          {:success true}
          (catch :default _ {:success false}))
 
