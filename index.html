@@ -6,6 +6,23 @@
   <meta name="theme-color" content="#f5f4ee">
   <meta name="description" content="Planera smörrebröd till ditt event. Fördela, justera och kopiera din beställning.">
   <title>Smörrebrödsplaneraren</title>
+  <link rel="canonical" href="https://agical.github.io/matrosen/">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="sv_SE">
+  <meta property="og:site_name" content="Smörrebrödsplaneraren">
+  <meta property="og:title" content="Smörrebrödsplaneraren">
+  <meta property="og:description" content="Ordna mat till eventet från Matrosen Smörrebröd">
+  <meta property="og:url" content="https://agical.github.io/matrosen/">
+  <meta property="og:image" content="https://agical.github.io/matrosen/share.jpg">
+  <meta property="og:image:type" content="image/jpeg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Smörrebrödsplaneraren – Ordna mat till eventet från Matrosen Smörrebröd. Avokadosmörrebröd i fokus, med Skagenröra och friterad rödspätta bredvid.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Smörrebrödsplaneraren">
+  <meta name="twitter:description" content="Ordna mat till eventet från Matrosen Smörrebröd">
+  <meta name="twitter:image" content="https://agical.github.io/matrosen/share.jpg">
+  <meta name="twitter:image:alt" content="Smörrebrödsplaneraren med Matrosens avokadosmörrebröd, Skagenröra och friterade rödspätta.">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23233650'/%3E%3Ctext x='32' y='47' text-anchor='middle' font-family='Georgia' font-size='46' fill='%23f5f4ee'%3ES%3C/text%3E%3C/svg%3E">
   <style>
     @font-face{font-family:'Bodoni Moda';font-style:normal;font-weight:500;font-display:swap;src:url('https://fonts.gstatic.com/s/bodonimoda/v28/aFT67PxzY382XsXX63LUYL6GYFcan6NJrKp-VPjfJMShrpsGFUt8oXzawIA.ttf') format('truetype')}
@@ -663,7 +680,7 @@
       {:uf/db (-> db
                   (assoc-in [:ui :copy-text] (when-not (:success result) text))
                   (assoc-in [:ui :notice]
-                            (if (:success result) "Beställningen är kopierad."
+                            (if (:success result) "Beställningen är kopierad till klippbordet."
                                 "Markera och kopiera beställningen i textfältet nedan.")))})
 
     :ui/ax.select-input
