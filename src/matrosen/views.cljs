@@ -1,6 +1,6 @@
 (ns matrosen.views
   (:require [matrosen.photos :as photos]
-            [matrosen.model :refer [menu-by-id order-menu dish-label gluten-free-id menu-url restaurant-url valid-number? valid-settings? valid-rows? quantity totals target count-step active-ids share-total format-number]]))
+            [matrosen.model :refer [menu-by-id order-menu dish-label gluten-free-id menu-url restaurant-url valid-number? valid-settings? valid-rows? quantity totals target active-ids share-total format-number]]))
 
 ;; Presentation reads the same calculations used by the order actions.
 (defn icon [kind]
@@ -35,8 +35,7 @@
   (let [row (get-in value [:rows id]) valid? (valid-number? (:qty row) 0 2000000 true)
         label (dish-label dish)
         desired (target value)
-        editable? (and (:enabled? row) desired (> (count (active-ids value)) 1))
-        step-enabled? (and editable? (valid-rows? value))
+        step-enabled? (and (:enabled? row) desired (> (count (active-ids value)) 1) (valid-rows? value))
         field-id (str "qty-" (cljs.core/name id))]
     [:tr {:replicant/key id :class (when-not (:enabled? row) "excluded")
           :data-has-variant (and (not gluten-free?) (contains? (:rows value) (gluten-free-id id)))}
@@ -66,13 +65,10 @@
        [:button.qty-step {:type "button" :aria-label (str "Minska " label)
                           :disabled (or (not step-enabled?) (zero? (quantity row)))
                           :on {:click [[:order/ax.step id -1]]}} "−"]
-       [:input.qty-input {:id field-id :type "number" :inputmode "numeric" :min 0 :max (or desired 2000000) :step (count-step value)
-                          :aria-label (str "Antal " (:unit (matrosen.model/portion value)) " " label) :aria-invalid (not valid?)
-                          :aria-describedby (when-not valid? "quantity-error")
-                          :value (:qty row) :disabled (not editable?)
-                          :on {:focus [[:ui/ax.select-input field-id]]
-                               :input [[:order/ax.edit [:rows id :qty] :event/target.value]]}}]
-       [:button.qty-step {:type "button" :aria-label (str "Öka " label)
+       [:span.qty-value {:id field-id :aria-invalid (when-not valid? true)
+                         :aria-describedby (when-not valid? "quantity-error")}
+        (:qty row)]
+       [:button.qty-step {:id (str "increase-" (cljs.core/name id)) :type "button" :aria-label (str "Öka " label)
                           :disabled (or (not step-enabled?) (and desired (>= (quantity row) desired)))
                           :on {:click [[:order/ax.step id 1]]}} "+"]]]
      [:td.numeric.veg-number {:class (when-not vego? "no-veg")}
@@ -155,7 +151,9 @@
         [:tfoot
          [:tr.footer-status
           [:td.footer-status {:colspan 4}
-           [:div.notice {:role "status" :aria-live "polite"} (:notice ui)]]]
+           [:div.notice-reveal {:class (when (:notice-open? ui) "is-open")}
+            [:div.notice-clip
+             [:div.notice {:role "status" :aria-live "polite"} (:notice ui)]]]]]
          [:tr
           [:th {:scope "row" :colspan 2}
            [:div.footer-overview

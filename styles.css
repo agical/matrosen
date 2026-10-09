@@ -99,11 +99,12 @@ input[type=checkbox]{accent-color:var(--ink);width:19px;height:19px;cursor:point
 @media(pointer:coarse){.split-button{min-height:44px}}
 .qty-cell{text-align:right}
 .qty-control{display:flex;align-items:center;justify-content:flex-end;gap:4px}
-.qty-input{width:60px;min-height:38px;padding:6px;text-align:center;font-size:16px}
+.qty-value{min-width:2.75rem;padding:6px 4px;text-align:center;font-size:16px;font-weight:600;font-variant-numeric:tabular-nums}
+.qty-value[aria-invalid=true]{color:var(--amber)}
 .qty-step{display:inline-flex;align-items:center;justify-content:center;width:38px;height:44px;flex:none;padding:0;border:1px solid var(--line);border-radius:5px;background:transparent;font-size:22px;line-height:1}
 .qty-step:hover:not(:disabled){background:var(--soft);border-color:var(--muted)}
 .row-share{display:block;font-size:11px;color:var(--muted);font-weight:400}
-.qty-input:disabled{background:transparent;border-color:transparent;color:var(--muted)}
+.excluded .qty-value{color:var(--muted);font-weight:400}
 .veg-number{color:var(--green);font-weight:600;padding-right:24px}
 .no-veg{color:var(--muted);font-weight:400}
 .excluded .dish-title{color:var(--muted);font-weight:400}
@@ -112,11 +113,10 @@ input[type=checkbox]{accent-color:var(--ink);width:19px;height:19px;cursor:point
 .excluded .vego-tag{background:var(--soft);color:var(--muted)}
 tfoot{position:sticky;bottom:0;z-index:1}
 tfoot th,tfoot td{background:var(--ink);color:var(--surface);border-top:1px solid var(--ink);padding:14px 16px;vertical-align:top}
-tfoot tr.footer-status:has(.notice:empty){display:none}
-tfoot td.footer-status{padding:8px 16px 0;border:0;background:var(--ink);font-size:13px;font-weight:400;line-height:1.4;text-align:left}
-tfoot th{font-size:15px;border-bottom-left-radius:5px;padding-left:22px}
-tfoot td{font-size:24px;font-weight:600;line-height:1.15;padding-right:24px}
-tfoot td:last-child{border-bottom-right-radius:5px;color:oklch(88% .07 151)}
+tfoot tr:last-child th{font-size:15px;border-bottom-left-radius:5px;padding-left:22px}
+tfoot tr:last-child td{font-size:24px;font-weight:600;line-height:1.15;padding-right:24px}
+tfoot tr:last-child td:last-child{border-bottom-right-radius:5px;color:oklch(88% .07 151)}
+tfoot td.footer-status{padding:0 16px;border:0;border-radius:0;background:var(--ink);color:var(--surface);font-size:13px;font-weight:400;line-height:1.4;text-align:left;overflow:hidden}
 .footer-overview{display:flex;align-items:center;justify-content:space-between;gap:16px}
 .footer-gluten{text-align:right;flex:none}
 .footer-number{display:block;font-size:24px;font-weight:600;line-height:1.15}
@@ -126,8 +126,10 @@ tfoot .total-quantity{text-align:center;padding-left:4px;padding-right:4px}
 .balance-label{display:flex;align-items:center;gap:7px}
 .balanced{color:var(--green)}.unbalanced{color:var(--amber)}
 .saved{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:5px}
-.notice{display:flex;align-items:center;gap:8px;margin:0 0 8px;padding:8px 12px;border-radius:4px;background:var(--soft);color:var(--ink);font-size:13px;font-weight:400}
-.notice:empty{display:none}
+.notice-reveal{display:grid;grid-template-rows:0fr;transition:grid-template-rows .25s ease}
+.notice-reveal.is-open{grid-template-rows:1fr}
+.notice-clip{overflow:hidden;min-height:0;min-width:0}
+.notice{margin:8px 0;padding:8px 12px;border-radius:4px;background:var(--soft);color:var(--ink);font-size:13px;font-weight:400;line-height:1.4;overflow-wrap:break-word}
 .menu-note{font-size:12px;color:var(--muted);max-width:72ch;margin:14px 0 0;line-height:1.6}
 .menu-note strong{font-weight:600;color:var(--green)}
 .footer{display:flex;flex-wrap:wrap;justify-content:space-between;gap:var(--space-lg);padding-top:var(--space-xl);margin-top:var(--space-xl);border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
@@ -153,7 +155,7 @@ textarea{width:100%;min-height:220px;padding:16px;border:1px solid var(--line);b
   tbody td,tbody th{padding:10px 4px;height:64px}.toggle-label{min-width:32px;min-height:54px}
   .dish-title{font-size:13px;gap:4px}.dish-description{font-size:11px}.vego-tag{font-size:9px;padding:2px 4px}
   .qty-control{display:grid;grid-template-columns:44px 44px;gap:2px 0}
-  .qty-input{grid-column:1 / -1;grid-row:1;width:88px;min-height:38px;padding:7px}
+  .qty-value{grid-column:1 / -1;grid-row:1;width:88px;min-width:0;padding:7px 4px}
   .qty-step{width:44px;height:44px}.veg-number{padding-right:8px;font-size:14px}
   .row-share{font-size:10px}.dish-description{overflow-wrap:anywhere}
   tfoot th{padding-left:12px;font-size:13px}tfoot td{padding-left:8px;padding-right:12px;font-size:21px}
@@ -167,5 +169,5 @@ textarea{width:100%;min-height:220px;padding:16px;border:1px solid var(--line);b
 @media print{
   body{background:white}.shell{padding:0;max-width:none}.planner,.order-actions,.event-link,.saved,.footer,.notice,.footer-status,.copy-fallback,.dish-preview,.dish-trigger,.qty-step,.split-button{display:none!important}
   .masthead{margin-bottom:24px}.excluded{display:none}tfoot th,tfoot td{position:static;background:var(--soft);color:var(--ink)}
-  tfoot td:last-child{color:var(--green)}.qty-input{border:0!important;background:transparent!important}.table-wrap{break-inside:avoid}
+  tfoot tr:last-child td:last-child{color:var(--green)}.table-wrap{break-inside:avoid}
 }

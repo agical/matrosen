@@ -3,7 +3,7 @@
             [matrosen.model :as model]
             [matrosen.views :as views]))
 
-(defn perform-effect! [[effect & args]]
+(defn perform-effect! [dispatch [effect & args]]
   (case effect
     :dom/fx.focus
     (when-let [element (.getElementById js/document (first args))]
@@ -19,9 +19,9 @@
     (when-let [element (.getElementById js/document (first args))]
       (set! (.-checked element) (second args)))
 
-    :dom/fx.set-input
-    (when-let [element (.getElementById js/document (first args))]
-      (set! (.-value element) (second args)))
+    :ui/fx.schedule
+    (let [[token delay action] args]
+      (js/setTimeout #(dispatch [[action token]]) delay))
 
     :storage/fx.load
     (assoc

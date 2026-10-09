@@ -39,14 +39,14 @@
 (defn replace-result [form result]
   (walk/postwalk-replace {:uf/prev-result result} form))
 
-(defn execute-effects! [fxs]
+(defn execute-effects! [fxs dispatch]
   (reduce
    (fn [promise raw-fx]
      (.then promise
             (fn [previous]
               (let [await? (= :uf/await (first raw-fx))
                     fx (replace-result (if await? (vec (rest raw-fx)) raw-fx) previous)
-                    result (effects/perform-effect! fx)]
+                    result (effects/perform-effect! dispatch fx)]
                 (when (= :uf/unhandled-fx result)
                   (throw (ex-info "Unhandled effect" {:effect fx})))
                 (if await? result previous)))))
@@ -60,9 +60,9 @@
          {:uf/keys [db fxs dxs]} (handle-actions before replicant-data action-list)]
      (when (some? db)
        (reset! db/!state db)
-       (effects/perform-effect! [:dom/fx.render db]))
+       (effects/perform-effect! dispatch! [:dom/fx.render db]))
      (if (seq fxs)
-       (-> (execute-effects! fxs)
+       (-> (execute-effects! fxs dispatch!)
            (.then (fn [result]
                     (when (seq dxs) (dispatch! (replace-result dxs result)))))
            (.catch (fn [error]
