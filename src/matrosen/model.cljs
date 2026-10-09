@@ -237,10 +237,14 @@
 
 (defn read-stored-order [{:keys [version order]}]
   (when (and (#{1 2 3 4} version) (map? order))
-    (let [migrated (if (= 4 version) order (assoc order :portion-size "whole"))]
-      (when (and (valid-stored-order? migrated)
-                 (or (= 1 version) (valid-stored-shares? migrated)))
-        (if (= 1 version) (update-shares migrated) migrated)))))
+    (let [prepared (if (= 4 version)
+                     order
+                     (assoc order :portion-size "half" :per-person 4))]
+      (when (and (valid-stored-order? prepared)
+                 (or (= 1 version) (valid-stored-shares? prepared)))
+        (if (= 4 version)
+          prepared
+          (distribute (cond-> prepared (= 1 version) update-shares)))))))
 
 ;; Share stable dish IDs and full-precision shares, independently of local storage.
 (def site-url "https://agical.github.io/matrosen/")
@@ -266,9 +270,12 @@
                (<= (count menu) (count rows) (count known-ids))
                (every? #(and (vector? %) (= 4 (count %)) (contains? known-ids (first %))) rows)
                (= (count rows) (count (set (map first rows)))))
-      {:guests guests :per-person per-person :portion-size (if (= 3 v) portion-size "whole")
-       :rows (into {} (map (fn [[id enabled? qty share]]
-                             [(known-ids id) {:enabled? enabled? :qty qty :share share}]) rows))})))
+      (let [order {:guests guests
+                   :per-person (if (= 3 v) per-person 4)
+                   :portion-size (if (= 3 v) portion-size "half")
+                   :rows (into {} (map (fn [[id enabled? qty share]]
+                                         [(known-ids id) {:enabled? enabled? :qty qty :share share}]) rows))}]
+        (if (= 3 v) order (distribute order))))))
 
 (defn read-shared-plan [fragment]
   (when (str/starts-with? fragment "#plan=")

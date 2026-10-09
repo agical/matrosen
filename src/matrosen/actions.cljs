@@ -53,9 +53,12 @@
         local (if (and (not (:initialized? db)) stored) stored (:order db))
         order (or (:order shared) local)
         notice (cond
-                 (:order shared) "Den delade beställningen är öppnad. Alla val, antal och fördelningsprocent är bevarade."
                  (:error shared) "Delningslänken kunde inte läsas. Din befintliga beställning visas."
-                 (and success (some? value) (nil? stored)) "Den sparade beställningen kunde inte läsas. Ett nytt förslag visas.")]
+                 (and (nil? (:order shared))
+                      success
+                      (some? value)
+                      (nil? stored))
+                 "Den sparade beställningen kunde inte läsas. Ett nytt förslag visas.")]
     (cond-> (merge {:uf/db (-> db
                               (assoc :order order :initialized? true)
                               (assoc-in [:ui :copy-text] nil)
