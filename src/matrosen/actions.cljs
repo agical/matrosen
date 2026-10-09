@@ -74,6 +74,15 @@
     (when (not= order updated)
       (change-order db updated nil))))
 
+(defn row-count-notice [order path typed]
+  (let [shown (model/number-value (get-in order path))
+        goal (model/target order)]
+    (cond
+      (= typed shown) nil
+      (and (some? goal) (= shown goal) (> typed goal))
+      (str "Antalet begränsades till målet på " goal " " (:unit (model/portion order)) ".")
+      :else "Antalet avrundades till ett jämnt antal.")))
+
 (defn handle-action [db [action & args]]
   (case action
     :preview/ax.toggle
@@ -109,16 +118,16 @@
     :order/ax.edit
     (let [[path value] args
           order (model/edit-order (:order db) path value)
-          corrected? (and (= :rows (first path))
-                          (model/valid-number? value 0 2000000 true)
-                          (not= (model/number-value value) (model/number-value (get-in order path))))]
-      (cond-> (change-order db order
-                            (when corrected? (str "Antalet begränsades till målet på " (model/target order) " " (:unit (model/portion order)) ".")))
-        corrected? (update :uf/fxs #(into [[:dom/fx.set-input (str "qty-" (name (second path))) (get-in order path)]] %))))
+          typed (model/number-value value)
+          notice (when (and (= :rows (first path))
+                            (model/valid-number? value 0 2000000 true))
+                   (row-count-notice order path typed))]
+      (cond-> (change-order db order notice)
+        notice (update :uf/fxs #(into [[:dom/fx.set-input (str "qty-" (name (second path))) (get-in order path)]] %))))
 
     :order/ax.step
     (let [[id delta] args order (:order db) row (get-in order [:rows id])
-          n (+ (model/quantity row) delta)]
+          n (model/step-count (model/quantity row) delta (model/count-step order))]
       (when (and (:enabled? row) (#{-1 1} delta) (model/valid-settings? order)
                  (model/valid-rows? order) (> (count (model/active-ids order)) 1)
                  (<= 0 n (model/target order)))

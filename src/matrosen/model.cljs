@@ -51,9 +51,9 @@
 
 (def portion-options
   {"half" {:label "Halvor" :unit "halvor" :per-person "Halvor per gäst"
-           :minimum 1 :maximum 200 :pieces 2}
+           :minimum 1 :maximum 200 :pieces 2 :step 2}
    "whole" {:label "Hela" :unit "hela smörrebröd" :per-person "Hela per gäst"
-            :minimum 0.5 :maximum 100 :pieces 1}})
+            :minimum 0.5 :maximum 100 :pieces 1 :step 1}})
 
 (defn portion-size [order]
   (:portion-size order "whole"))
@@ -75,9 +75,23 @@
 (defn valid-rows? [order]
   (every? (fn [[_ row]] (valid-number? (:qty row) 0 2000000 true)) (:rows order)))
 
+(defn count-step [order]
+  (:step (portion order) 1))
+
+(defn round-count [n step]
+  (* step (js/Math.round (/ n step))))
+
+(defn step-count [n delta step]
+  (let [units (/ n step)
+        toward (if (pos? delta) (js/Math.ceil units) (js/Math.floor units))
+        on-step (* step toward)]
+    (* step (if (= on-step n) (+ toward delta) toward))))
+
 (defn target [order]
   (when (valid-settings? order)
-    (js/Math.ceil (- (* (number-value (:guests order)) (number-value (:per-person order))) 1e-9))))
+    (let [product (* (number-value (:guests order)) (number-value (:per-person order)))
+          raw (js/Math.ceil (- product 1e-9))]
+      (round-count raw (count-step order)))))
 
 (defn active-ids [order]
   (mapv :id (filter #(get-in order [:rows (:id %) :enabled?]) (order-menu order))))
@@ -125,24 +139,38 @@
         extras (set (map :id (take remaining (sort-by (juxt (comp - :remainder) :index) portions))))]
     (into {} (map (fn [{:keys [id base]}] [id (+ base (if (extras id) 1 0))]) portions))))
 
+(defn allocate [order n]
+  (let [step (count-step order)
+        scaled (weighted-shares order (quot n step))]
+    (update-vals scaled (fn [qty] (* qty step)))))
+
+(defn split-counts [n step ids]
+  (update-vals (shares (quot n step) ids) (fn [qty] (* qty step))))
+
 (defn distribute [order]
   (let [n (target order)]
     (if (and n (pos? (share-total order)))
-      (let [allocation (weighted-shares order n)]
+      (let [allocation (allocate order n)]
         (update order :rows
-                (fn [rows] (into {} (map (fn [[id row]] [id (assoc row :qty (get allocation id 0))]) rows)))))
+                (fn [rows]
+                  (into {} (map (fn [[id row]]
+                                  [id (assoc row :qty (get allocation id 0))])
+                                rows)))))
       order)))
 
 (defn rebalance-row [order id]
   (let [n (target order)
+        step (count-step order)
         peers (filterv #(not= id %) (active-ids order))
-        chosen (if (seq peers) (min n (quantity (get-in order [:rows id]))) n)
+        chosen (if (seq peers)
+                 (min n (max 0 (round-count (quantity (get-in order [:rows id])) step)))
+                 n)
         remainder (- n chosen)
         peer-order (assoc-in order [:rows id :enabled?] false)
         peer-total (share-total peer-order)
         allocation (if (pos? peer-total)
-                     (weighted-shares peer-order remainder)
-                     (shares remainder peers))]
+                     (allocate peer-order remainder)
+                     (split-counts remainder step peers))]
     ;; Keep fractional shares through every edit. Feeding rounded quantities back
     ;; into shares makes alternating increases steal the same bread back and forth.
     (reduce (fn [result peer]
@@ -183,18 +211,25 @@
 
 (defn toggle-row [order id]
   (let [row (get-in order [:rows id])
-        peers (filterv #(and (not= id %) (= (:vego? (menu-by-id id)) (:vego? (menu-by-id %))))
+        peers (filterv #(and (not= id %)
+                             (= (:vego? (menu-by-id id)) (:vego? (menu-by-id %))))
                        (active-ids order))
-        n (quantity row) share (:share row)]
+        n (round-count (quantity row) (count-step order))
+        share (:share row)]
     (cond
-      (not (:enabled? row)) {:order (assoc-in order [:rows id] {:enabled? true :qty 0 :share 0})}
-      (and (or (pos? n) (pos? share)) (empty? peers)) {:error "Det här är sista aktiva sorten i kategorin. Sätt antalet till 0 eller aktivera en annan sort först."}
-      :else {:order (reduce (fn [result [peer amount]]
-                              (-> result
-                                  (assoc-in [:rows peer :qty] (+ (quantity (get-in result [:rows peer])) amount))
-                                  (update-in [:rows peer :share] + (/ share (count peers)))))
-                            (assoc-in order [:rows id] {:enabled? false :qty 0 :share 0})
-                            (shares n peers))})))
+      (not (:enabled? row))
+      {:order (assoc-in order [:rows id] {:enabled? true :qty 0 :share 0})}
+
+      (and (or (pos? n) (pos? share)) (empty? peers))
+      {:error "Det här är sista aktiva sorten i kategorin. Sätt antalet till 0 eller aktivera en annan sort först."}
+
+      :else
+      {:order (reduce (fn [result [peer amount]]
+                        (-> result
+                            (assoc-in [:rows peer :qty] (+ (quantity (get-in result [:rows peer])) amount))
+                            (update-in [:rows peer :share] + (/ share (count peers)))))
+                      (assoc-in order [:rows id] {:enabled? false :qty 0 :share 0})
+                      (split-counts n (count-step order) peers))})))
 
 (defn default-order []
   (let [active-count (count (remove :initially-off? menu))]

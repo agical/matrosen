@@ -1,6 +1,6 @@
 (ns matrosen.views
   (:require [matrosen.photos :as photos]
-            [matrosen.model :refer [menu-by-id order-menu dish-label gluten-free-id menu-url restaurant-url valid-number? valid-settings? valid-rows? quantity totals target active-ids share-total format-number]]))
+            [matrosen.model :refer [menu-by-id order-menu dish-label gluten-free-id menu-url restaurant-url valid-number? valid-settings? valid-rows? quantity totals target count-step active-ids share-total format-number]]))
 
 ;; Presentation reads the same calculations used by the order actions.
 (defn icon [kind]
@@ -66,7 +66,7 @@
        [:button.qty-step {:type "button" :aria-label (str "Minska " label)
                           :disabled (or (not step-enabled?) (zero? (quantity row)))
                           :on {:click [[:order/ax.step id -1]]}} "−"]
-       [:input.qty-input {:id field-id :type "number" :inputmode "numeric" :min 0 :max (or desired 2000000) :step 1
+       [:input.qty-input {:id field-id :type "number" :inputmode "numeric" :min 0 :max (or desired 2000000) :step (count-step value)
                           :aria-label (str "Antal " (:unit (matrosen.model/portion value)) " " label) :aria-invalid (not valid?)
                           :aria-describedby (when-not valid? "quantity-error")
                           :value (:qty row) :disabled (not editable?)
@@ -145,7 +145,6 @@
          (icon :link) "Kopiera för delning"]
         [:button.secondary {:on {:click [[:order/ax.copy]]} :disabled (or (not settings-valid?) (not rows-valid?) (zero? total))}
          (icon :copy) "Kopiera"]]]
-      [:div.notice {:role "status" :aria-live "polite"} (:notice ui)]
       [:div.table-wrap
        [:table
         [:caption.sr-only "Smörrebröd: välj sorter, ändra antal och se hur många som är vegetariska."]
@@ -154,6 +153,9 @@
                  [:th.numeric {:scope "col"} (:label (matrosen.model/portion value))] [:th.numeric {:scope "col"} "Vego*"]]]
         [:tbody (for [dish dishes] (menu-row value (:preview ui) dish))]
         [:tfoot
+         [:tr.footer-status
+          [:td.footer-status {:colspan 4}
+           [:div.notice {:role "status" :aria-live "polite"} (:notice ui)]]]
          [:tr
           [:th {:scope "row" :colspan 2}
            [:div.footer-overview
