@@ -25,13 +25,13 @@
 
     :storage/fx.load
     (assoc
-      (try
-        (let [raw (.getItem js/localStorage model/storage-key)]
-          {:success true :value (when raw
+     (try
+       (let [raw (.getItem js/localStorage model/storage-key)]
+         {:success true :value (when raw
                                  (try (js->clj (js/JSON.parse raw) :keywordize-keys true)
                                       (catch :default _ :invalid)))})
-        (catch :default _ {:success false}))
-      :fragment (.-hash js/location))
+       (catch :default _ {:success false}))
+     :fragment (.-hash js/location))
 
     :url/fx.clear-plan
     ;; Consume the snapshot so refreshing after an edit keeps the newer local plan.

@@ -29,14 +29,14 @@
 
 (defn change-order [db value message]
   (merge
-    {:uf/db (-> db
-                (assoc :order value)
-                (assoc-in [:ui :notice] message)
-                (assoc-in [:ui :copy-text] nil)
-                (assoc-in [:ui :saved]
-                          (if (and (model/valid-settings? value) (model/valid-rows? value))
-                            "Sparar…" "Ogiltiga värden sparas inte")))}
-    (save-recipe value)))
+   {:uf/db (-> db
+               (assoc :order value)
+               (assoc-in [:ui :notice] message)
+               (assoc-in [:ui :copy-text] nil)
+               (assoc-in [:ui :saved]
+                         (if (and (model/valid-settings? value) (model/valid-rows? value))
+                           "Sparar…" "Ogiltiga värden sparas inte")))}
+   (save-recipe value)))
 
 (defn reset-order
   "Restores the starting order and drops a shared plan from the address."
@@ -79,21 +79,21 @@
                   (if (= 1 version) (model/update-shares (:order value)) (:order value)) (:order db))
           order (or (:order shared) local)]
       (cond->
-        (merge {:uf/db (-> db (assoc :order order :initialized? true)
-                           (assoc-in [:ui :copy-text] nil)
-                           (assoc-in [:ui :preview] nil)
-                           (assoc-in [:ui :saved] (if success "Sparar…" "Lokalt sparande är inte tillgängligt"))
-                           (assoc-in [:ui :notice]
-                                     (cond
-                                       (:order shared) "Den delade beställningen är öppnad. Alla antal och fördelningsprocent är bevarade."
-                                       (:error shared) "Delningslänken kunde inte läsas. Din befintliga beställning visas."
-                                       (and success (some? value) (not valid?)) "Den sparade beställningen kunde inte läsas. Ett nytt förslag visas.")))}
-               (when success (save-recipe order)))
+       (merge {:uf/db (-> db (assoc :order order :initialized? true)
+                          (assoc-in [:ui :copy-text] nil)
+                          (assoc-in [:ui :preview] nil)
+                          (assoc-in [:ui :saved] (if success "Sparar…" "Lokalt sparande är inte tillgängligt"))
+                          (assoc-in [:ui :notice]
+                                    (cond
+                                      (:order shared) "Den delade beställningen är öppnad. Alla antal och fördelningsprocent är bevarade."
+                                      (:error shared) "Delningslänken kunde inte läsas. Din befintliga beställning visas."
+                                      (and success (some? value) (not valid?)) "Den sparade beställningen kunde inte läsas. Ett nytt förslag visas.")))}
+              (when success (save-recipe order)))
         (:order shared) (update :uf/fxs (fnil conj []) [:url/fx.clear-plan fragment])))
 
     :storage/ax.saved
     {:uf/db (assoc-in db [:ui :saved]
-                     (if (:success (first args)) "Sparat i den här webbläsaren" "Kunde inte spara i webbläsaren"))}
+                      (if (:success (first args)) "Sparat i den här webbläsaren" "Kunde inte spara i webbläsaren"))}
 
     :order/ax.edit
     (let [[path value] args
@@ -102,7 +102,7 @@
                           (model/valid-number? value 0 1000000 true)
                           (not= (model/number-value value) (model/number-value (get-in order path))))]
       (cond-> (change-order db order
-                (when corrected? (str "Antalet begränsades till målet på " (model/target order) " smörrebröd.")))
+                            (when corrected? (str "Antalet begränsades till målet på " (model/target order) " smörrebröd.")))
         corrected? (update :uf/fxs #(into [[:dom/fx.set-input (str "qty-" (name (second path))) (get-in order path)]] %))))
 
     :order/ax.step
@@ -134,12 +134,12 @@
               n (model/quantity (get-in order [:rows id]))]
           (if error {:uf/db (assoc-in db [:ui :notice] error)
                      :uf/fxs [[:dom/fx.check-input (str "include-" (name id)) (get-in order [:rows id :enabled?])]]}
-            (change-order db next-order
-              (if was-active?
-                (if (pos? n) (str n " smörrebröd fördelades på övriga "
-                                 (if (:vego? (model/menu-by-id id)) "vegosorter." "icke-vegetariska sorter."))
-                    "Sorten är avstängd.")
-                "Sorten är aktiverad med 0 och 0 %. Använd + eller ange ett antal för att ge den en andel."))))))
+              (change-order db next-order
+                            (if was-active?
+                              (if (pos? n) (str n " smörrebröd fördelades på övriga "
+                                                (if (:vego? (model/menu-by-id id)) "vegosorter." "icke-vegetariska sorter."))
+                                  "Sorten är avstängd.")
+                              "Sorten är aktiverad med 0 och 0 %. Använd + eller ange ett antal för att ge den en andel."))))))
 
     :order/ax.share
     (when (model/shareable? (:order db))

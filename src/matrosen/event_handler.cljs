@@ -13,44 +13,44 @@
 
 (defn enrich [state replicant-data action]
   (walk/postwalk
-    (fn [value]
-      (cond
-        (= :event/target.value value) (some-> replicant-data :replicant/js-event .-target .-value)
-        (= :event/detail value) (some-> replicant-data :replicant/js-event .-detail)
-        (= :preview/anchor value) (preview-anchor replicant-data)
-        (= :location/hash value) (.-hash js/location)
-        (and (vector? value) (= :db/get (first value))) (get state (second value))
-        :else value))
-    action))
+   (fn [value]
+     (cond
+       (= :event/target.value value) (some-> replicant-data :replicant/js-event .-target .-value)
+       (= :event/detail value) (some-> replicant-data :replicant/js-event .-detail)
+       (= :preview/anchor value) (preview-anchor replicant-data)
+       (= :location/hash value) (.-hash js/location)
+       (and (vector? value) (= :db/get (first value))) (get state (second value))
+       :else value))
+   action))
 
 (defn handle-actions [state replicant-data action-list]
   (reduce
-    (fn [{:uf/keys [db] :as result} action]
-      (let [next (actions/handle-action db (enrich db replicant-data action))]
-        (when (= :uf/unhandled-ax next)
-          (throw (ex-info "Unhandled action" {:action action})))
-        (cond-> result
-          (contains? next :uf/db) (assoc :uf/db (:uf/db next))
-          (:uf/fxs next) (update :uf/fxs into (:uf/fxs next))
-          (:uf/dxs next) (update :uf/dxs into (:uf/dxs next)))))
-    {:uf/db state :uf/fxs [] :uf/dxs []}
-    action-list))
+   (fn [{:uf/keys [db] :as result} action]
+     (let [next (actions/handle-action db (enrich db replicant-data action))]
+       (when (= :uf/unhandled-ax next)
+         (throw (ex-info "Unhandled action" {:action action})))
+       (cond-> result
+         (contains? next :uf/db) (assoc :uf/db (:uf/db next))
+         (:uf/fxs next) (update :uf/fxs into (:uf/fxs next))
+         (:uf/dxs next) (update :uf/dxs into (:uf/dxs next)))))
+   {:uf/db state :uf/fxs [] :uf/dxs []}
+   action-list))
 
 (defn replace-result [form result]
   (walk/postwalk #(if (= :uf/prev-result %) result %) form))
 
 (defn execute-effects! [fxs]
   (reduce
-    (fn [promise raw-fx]
-      (.then promise
-        (fn [previous]
-          (let [await? (= :uf/await (first raw-fx))
-                fx (replace-result (if await? (vec (rest raw-fx)) raw-fx) previous)
-                result (effects/perform-effect! fx)]
-            (when (= :uf/unhandled-fx result)
-              (throw (ex-info "Unhandled effect" {:effect fx})))
-            (if await? result previous)))))
-    (js/Promise.resolve nil) fxs))
+   (fn [promise raw-fx]
+     (.then promise
+            (fn [previous]
+              (let [await? (= :uf/await (first raw-fx))
+                    fx (replace-result (if await? (vec (rest raw-fx)) raw-fx) previous)
+                    result (effects/perform-effect! fx)]
+                (when (= :uf/unhandled-fx result)
+                  (throw (ex-info "Unhandled effect" {:effect fx})))
+                (if await? result previous)))))
+   (js/Promise.resolve nil) fxs))
 
 ;; The only runtime state read and write. Rendering receives the committed value.
 (defn dispatch!

@@ -22,7 +22,7 @@
     [:section#dish-preview.dish-preview
      {:role "dialog" :aria-modal false :aria-labelledby "preview-title" :style position}
      [:button#preview-close.preview-close {:type "button" :aria-label "Stäng förhandsvisning"
-                                          :on {:click [[:preview/ax.close true]]}} (icon :close)]
+                                           :on {:click [[:preview/ax.close true]]}} (icon :close)]
      (if photo
        [:img.preview-photo {:src (:src photo) :alt (str name " från Matrosen") :width 640 :height 360}]
        [:div.preview-empty (icon :photo) "Bild saknas"])
@@ -67,11 +67,11 @@
                           :disabled (or (not step-enabled?) (zero? (quantity row)))
                           :on {:click [[:order/ax.step id -1]]}} "−"]
        [:input.qty-input {:id field-id :type "number" :inputmode "numeric" :min 0 :max (or desired 1000000) :step 1
-                         :aria-label (str "Antal " label) :aria-invalid (not valid?)
-                         :aria-describedby (when-not valid? "quantity-error")
-                         :value (:qty row) :disabled (not editable?)
-                         :on {:focus [[:ui/ax.select-input field-id]]
-                              :input [[:order/ax.edit [:rows id :qty] :event/target.value]]}}]
+                          :aria-label (str "Antal " label) :aria-invalid (not valid?)
+                          :aria-describedby (when-not valid? "quantity-error")
+                          :value (:qty row) :disabled (not editable?)
+                          :on {:focus [[:ui/ax.select-input field-id]]
+                               :input [[:order/ax.edit [:rows id :qty] :event/target.value]]}}]
        [:button.qty-step {:type "button" :aria-label (str "Öka " label)
                           :disabled (or (not step-enabled?) (and desired (>= (quantity row) desired)))
                           :on {:click [[:order/ax.step id 1]]}} "+"]]]

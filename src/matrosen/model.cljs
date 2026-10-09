@@ -27,7 +27,7 @@
 (def all-menu
   (vec (mapcat (fn [dish]
                  [dish (assoc dish :id (gluten-free-id (:id dish))
-                                   :base-id (:id dish) :gluten-free? true)]) menu)))
+                              :base-id (:id dish) :gluten-free? true)]) menu)))
 
 (def menu-by-id (into {} (map (juxt :id identity) all-menu)))
 
@@ -98,11 +98,11 @@
 (defn weighted-shares [order n]
   (let [total (share-total order)
         portions (map-indexed
-                   (fn [i id]
-                     (let [exact (* n (/ (get-in order [:rows id :share]) total))
-                           base (js/Math.floor exact)]
-                       {:id id :index i :base base :remainder (- exact base)}))
-                   (filterv #(pos? (get-in order [:rows % :share])) (active-ids order)))
+                  (fn [i id]
+                    (let [exact (* n (/ (get-in order [:rows id :share]) total))
+                          base (js/Math.floor exact)]
+                      {:id id :index i :base base :remainder (- exact base)}))
+                  (filterv #(pos? (get-in order [:rows % :share])) (active-ids order)))
         remaining (- n (reduce + 0 (map :base portions)))
         extras (set (map :id (take remaining (sort-by (juxt (comp - :remainder) :index) portions))))]
     (into {} (map (fn [{:keys [id base]}] [id (+ base (if (extras id) 1 0))]) portions))))
@@ -172,26 +172,26 @@
       (not (:enabled? row)) {:order (assoc-in order [:rows id] {:enabled? true :qty 0 :share 0})}
       (and (or (pos? n) (pos? share)) (empty? peers)) {:error "Det här är sista aktiva sorten i kategorin. Sätt antalet till 0 eller aktivera en annan sort först."}
       :else {:order (reduce (fn [result [peer amount]]
-                             (-> result
-                                 (assoc-in [:rows peer :qty] (+ (quantity (get-in result [:rows peer])) amount))
-                                 (update-in [:rows peer :share] + (/ share (count peers)))))
-                           (assoc-in order [:rows id] {:enabled? false :qty 0 :share 0})
-                           (shares n peers))})))
+                              (-> result
+                                  (assoc-in [:rows peer :qty] (+ (quantity (get-in result [:rows peer])) amount))
+                                  (update-in [:rows peer :share] + (/ share (count peers)))))
+                            (assoc-in order [:rows id] {:enabled? false :qty 0 :share 0})
+                            (shares n peers))})))
 
 (defn default-order []
   (let [active-count (count (remove :initially-off? menu))]
     (distribute {:guests 25 :per-person 3
                  :rows (into {} (map (fn [{:keys [id initially-off?]}]
-                                      [id {:enabled? (not initially-off?) :qty 0
-                                           :share (if initially-off? 0 (/ 1 active-count))}]) menu))})))
+                                       [id {:enabled? (not initially-off?) :qty 0
+                                            :share (if initially-off? 0 (/ 1 active-count))}]) menu))})))
 
 (defn valid-stored-order? [order]
   (and (map? order) (valid-settings? order) (map? (:rows order))
        (every? #(contains? (:rows order) (:id %)) menu)
        (every? #(contains? menu-by-id %) (keys (:rows order)))
        (every? (fn [[_ row]] (and (map? row) (boolean? (:enabled? row))
-                                 (valid-number? (:qty row) 0 1000000 true)
-                                 (or (:enabled? row) (zero? (quantity row))))) (:rows order))))
+                                  (valid-number? (:qty row) 0 1000000 true)
+                                  (or (:enabled? row) (zero? (quantity row))))) (:rows order))))
 
 (defn valid-stored-shares? [order]
   (and (every? (fn [[_ row]]
@@ -210,11 +210,11 @@
 (defn share-link [order]
   (str site-url "#plan="
        (js/encodeURIComponent
-         (js/JSON.stringify
-           (clj->js {:v 2 :guests (:guests order) :per-person (:per-person order)
-                     :rows (mapv (fn [{:keys [id]}]
-                                   (let [{:keys [enabled? qty share]} (get-in order [:rows id])]
-                                     [(name id) enabled? qty share])) (order-menu order))})))))
+        (js/JSON.stringify
+         (clj->js {:v 2 :guests (:guests order) :per-person (:per-person order)
+                   :rows (mapv (fn [{:keys [id]}]
+                                 (let [{:keys [enabled? qty share]} (get-in order [:rows id])]
+                                   [(name id) enabled? qty share])) (order-menu order))})))))
 
 (defn read-shared-plan [fragment]
   (when (str/starts-with? fragment "#plan=")
@@ -228,7 +228,7 @@
                  (= (count rows) (count (set (map first rows)))))
           (let [order {:guests guests :per-person per-person
                        :rows (into {} (map (fn [[id enabled? qty share]]
-                                            [(known-ids id) {:enabled? enabled? :qty qty :share share}]) rows))}]
+                                             [(known-ids id) {:enabled? enabled? :qty qty :share share}]) rows))}]
             (if (shareable? order) {:order order} {:error true}))
           {:error true}))
       (catch :default _ {:error true}))))
@@ -239,13 +239,13 @@
 (defn order-text [value]
   (let [{:keys [total vego gluten-free]} (totals value)]
     (str/join "\n"
-      (concat ["Smörrebrödsplaneraren" ""]
-              (keep (fn [{:keys [id vego?] :as dish}]
-                      (let [row (get-in value [:rows id]) n (quantity row)]
-                        (when (and (:enabled? row) (pos? n))
-                          (str n " × " (dish-label dish) (when vego? " (vego*)"))))) (order-menu value))
-              ["" (str "Totalt: " total " smörrebröd, varav " vego " vego*.")
-               (str "Glutenfria: " gluten-free " smörrebröd.")
-               (str "Antal gäster: " (format-number (number-value (:guests value))))
-               (str "Smörrebröd per person: " (format-number (/ total (number-value (:guests value)))))
-               "" "*Vego enligt menybeskrivningarna, inklusive ägg och mjölk. Bekräfta med Matrosen."]))))
+              (concat ["Smörrebrödsplaneraren" ""]
+                      (keep (fn [{:keys [id vego?] :as dish}]
+                              (let [row (get-in value [:rows id]) n (quantity row)]
+                                (when (and (:enabled? row) (pos? n))
+                                  (str n " × " (dish-label dish) (when vego? " (vego*)"))))) (order-menu value))
+                      ["" (str "Totalt: " total " smörrebröd, varav " vego " vego*.")
+                       (str "Glutenfria: " gluten-free " smörrebröd.")
+                       (str "Antal gäster: " (format-number (number-value (:guests value))))
+                       (str "Smörrebröd per person: " (format-number (/ total (number-value (:guests value)))))
+                       "" "*Vego enligt menybeskrivningarna, inklusive ägg och mjölk. Bekräfta med Matrosen."]))))
