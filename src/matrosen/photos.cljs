@@ -1,4 +1,5 @@
 (ns matrosen.photos)
+
 ;; Menu-gallery matches checked against Matrosen’s labelled Wolt dishes.
 ;; Photographs load on demand from their source sites at preview resolution.
 (def photos

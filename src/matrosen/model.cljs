@@ -3,7 +3,9 @@
 
 ;; Menu data and identity stay separate from the editable order.
 (def menu-url "https://static.thatsup.website/37/71554/Matrosen_Meny_20250918.pdf?v=1762507306")
+
 (def restaurant-url "https://matrosensmorrebrod.com/")
+
 (def menu
   [{:id :avokado :name "Avokado" :description "Ägg · majonnäs" :vego? true}
    {:id :brie :name "Brie" :description "Marmelad · pumpafrön" :vego? true}
@@ -19,16 +21,22 @@
    {:id :currykyckling :name "Currykyckling" :description "Selleri · bacon · rödlök" :vego? false}
    {:id :gamle-ole :name "Gamle Ole" :description "Skygelé · mörk rom" :vego? false}
    {:id :lun-postej :name "Lun postej" :description "Varm pastej" :vego? false :initially-off? true}])
+
 (defn gluten-free-id [id] (keyword (str (name id) "-glutenfri")))
+
 (def all-menu
   (vec (mapcat (fn [dish]
                  [dish (assoc dish :id (gluten-free-id (:id dish))
                                    :base-id (:id dish) :gluten-free? true)]) menu)))
+
 (def menu-by-id (into {} (map (juxt :id identity) all-menu)))
+
 (defn order-menu [order]
   (filterv #(contains? (:rows order) (:id %)) all-menu))
+
 (defn dish-label [{:keys [name gluten-free?]}]
   (str name (when gluten-free? " (glutenfri)")))
+
 (def storage-key "matrosen.order.v1")
 
 ;; Guests and breads per person apply the saved shares to the new target.
@@ -36,33 +44,43 @@
 (defn number-value [value]
   (when-not (or (nil? value) (= "" value))
     (let [n (js/Number value)] (when (js/Number.isFinite n) n))))
+
 (defn valid-number? [value minimum maximum integer?]
   (let [n (number-value value)]
     (and (some? n) (<= minimum n maximum) (or (not integer?) (js/Number.isInteger n)))))
+
 (defn valid-settings? [order]
   (and (valid-number? (:guests order) 1 10000 true)
        (valid-number? (:per-person order) 0.5 100 false)))
+
 (defn quantity [row] (if (valid-number? (:qty row) 0 1000000 true) (number-value (:qty row)) 0))
+
 (defn valid-rows? [order]
   (every? (fn [[_ row]] (valid-number? (:qty row) 0 1000000 true)) (:rows order)))
+
 (defn target [order]
   (when (valid-settings? order)
     (js/Math.ceil (- (* (number-value (:guests order)) (number-value (:per-person order))) 1e-9))))
+
 (defn active-ids [order]
   (mapv :id (filter #(get-in order [:rows (:id %) :enabled?]) (order-menu order))))
+
 (defn totals [order]
   (reduce (fn [result {:keys [id vego? gluten-free?]}]
             (let [row (get-in order [:rows id]) n (if (:enabled? row) (quantity row) 0)]
               (-> result (update :total + n) (update :vego + (if vego? n 0))
                   (update :gluten-free + (if gluten-free? n 0)))))
           {:total 0 :vego 0 :gluten-free 0} (order-menu order)))
+
 (defn shares [n ids]
   (if (seq ids)
     (let [base (quot n (count ids)) extra (mod n (count ids))]
       (into {} (map-indexed (fn [i id] [id (+ base (if (< i extra) 1 0))]) ids)))
     {}))
+
 (defn share-total [order]
   (reduce + 0 (map #(get-in order [:rows % :share] 0) (active-ids order))))
+
 ;; Only used to migrate older saved orders that have no independent shares.
 (defn update-shares [order]
   (if (valid-rows? order)
@@ -74,6 +92,7 @@
                                            (if (and (:enabled? row) (pos? total))
                                              (/ (quantity row) total) 0))]) rows)))))
     order))
+
 ;; Largest remainders make whole breads add up to the target. Menu order breaks ties.
 ;; Allocation never rewrites shares: rounding must not change the next distribution.
 (defn weighted-shares [order n]
@@ -87,6 +106,7 @@
         remaining (- n (reduce + 0 (map :base portions)))
         extras (set (map :id (take remaining (sort-by (juxt (comp - :remainder) :index) portions))))]
     (into {} (map (fn [{:keys [id base]}] [id (+ base (if (extras id) 1 0))]) portions))))
+
 (defn distribute [order]
   (let [n (target order)]
     (if (and n (pos? (share-total order)))
@@ -94,6 +114,7 @@
         (update order :rows
                 (fn [rows] (into {} (map (fn [[id row]] [id (assoc row :qty (get allocation id 0))]) rows)))))
       order)))
+
 (defn rebalance-row [order id]
   (let [n (target order)
         peers (filterv #(not= id %) (active-ids order))
@@ -117,6 +138,7 @@
                 (assoc-in [:rows id :qty] chosen)
                 (assoc-in [:rows id :share] (/ chosen n)))
             peers)))
+
 (defn edit-order [order path value]
   (let [edited (assoc-in order path value)]
     (cond
@@ -133,12 +155,14 @@
 
       :else
       edited)))
+
 (defn add-gluten-free-row [order id]
   (let [dish (menu-by-id id) new-id (gluten-free-id id)]
     (if (and dish (not (:gluten-free? dish))
              (get-in order [:rows id :enabled?]) (not (contains? (:rows order) new-id)))
       (assoc-in order [:rows new-id] {:enabled? true :qty 0 :share 0})
       order)))
+
 (defn toggle-row [order id]
   (let [row (get-in order [:rows id])
         peers (filterv #(and (not= id %) (= (:vego? (menu-by-id id)) (:vego? (menu-by-id %))))
@@ -153,12 +177,14 @@
                                  (update-in [:rows peer :share] + (/ share (count peers)))))
                            (assoc-in order [:rows id] {:enabled? false :qty 0 :share 0})
                            (shares n peers))})))
+
 (defn default-order []
   (let [active-count (count (remove :initially-off? menu))]
     (distribute {:guests 25 :per-person 3
                  :rows (into {} (map (fn [{:keys [id initially-off?]}]
                                       [id {:enabled? (not initially-off?) :qty 0
                                            :share (if initially-off? 0 (/ 1 active-count))}]) menu))})))
+
 (defn valid-stored-order? [order]
   (and (map? order) (valid-settings? order) (map? (:rows order))
        (every? #(contains? (:rows order) (:id %)) menu)
@@ -166,6 +192,7 @@
        (every? (fn [[_ row]] (and (map? row) (boolean? (:enabled? row))
                                  (valid-number? (:qty row) 0 1000000 true)
                                  (or (:enabled? row) (zero? (quantity row))))) (:rows order))))
+
 (defn valid-stored-shares? [order]
   (and (every? (fn [[_ row]]
                  (and (number? (:share row)) (valid-number? (:share row) 0 (+ 1 1e-9) false)
@@ -176,8 +203,10 @@
 
 ;; Share stable dish IDs and full-precision shares, independently of local storage.
 (def site-url "https://agical.github.io/matrosen/")
+
 (defn shareable? [order]
   (and (valid-stored-order? order) (valid-stored-shares? order)))
+
 (defn share-link [order]
   (str site-url "#plan="
        (js/encodeURIComponent
@@ -186,6 +215,7 @@
                      :rows (mapv (fn [{:keys [id]}]
                                    (let [{:keys [enabled? qty share]} (get-in order [:rows id])]
                                      [(name id) enabled? qty share])) (order-menu order))})))))
+
 (defn read-shared-plan [fragment]
   (when (str/starts-with? fragment "#plan=")
     (try
@@ -205,6 +235,7 @@
 
 (defn format-number [n]
   (.toLocaleString n "sv-SE" #js {:maximumFractionDigits 2}))
+
 (defn order-text [value]
   (let [{:keys [total vego gluten-free]} (totals value)]
     (str/join "\n"

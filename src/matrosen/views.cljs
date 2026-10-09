@@ -16,6 +16,7 @@
      :leaf [:g [:path {:d "M20 3C10 2 3 7 5 14c2 7 15 7 15-11Z"}] [:path {:d "m4 21 11-12"}]]
      :reset [:g [:path {:d "M4 12a8 8 0 1 0 2.2-5.6"}] [:path {:d "M4 4v5h5"}]]
      [:circle {:cx 12 :cy 12 :r 8}])])
+
 (defn dish-preview [{:keys [id position]}]
   (let [{:keys [name description base-id gluten-free?]} (menu-by-id id) photo (get photos/photos (or base-id id))]
     [:section#dish-preview.dish-preview
@@ -29,6 +30,7 @@
       (when gluten-free? [:p "Bilden visar originalet."])
       [:a {:href (or (:source photo) "https://matrosensmorrebrod.com/meny") :target "_blank" :rel "noreferrer"}
        (if photo (str "Foto: " (:credit photo)) "Se Matrosens meny") (icon :arrow)]]]))
+
 (defn menu-row [value preview {:keys [id name description vego? gluten-free?] :as dish}]
   (let [row (get-in value [:rows id]) valid? (valid-number? (:qty row) 0 1000000 true)
         label (dish-label dish)
@@ -75,6 +77,7 @@
                           :on {:click [[:order/ax.step id 1]]}} "+"]]]
      [:td.numeric.veg-number {:class (when-not vego? "no-veg")}
       (if vego? (quantity row) [:span {:aria-label "0 vegetariska"} "–"])]]))
+
 (defn app [{:keys [order ui]}]
   (let [value order {:keys [total vego gluten-free]} (totals value) desired (target value)
         dishes (order-menu value)
