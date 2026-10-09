@@ -49,14 +49,31 @@
   (let [n (number-value value)]
     (and (some? n) (<= minimum n maximum) (or (not integer?) (js/Number.isInteger n)))))
 
-(defn valid-settings? [order]
-  (and (valid-number? (:guests order) 1 10000 true)
-       (valid-number? (:per-person order) 0.5 100 false)))
+(def portion-options
+  {"half" {:label "Halvor" :unit "halvor" :per-person "Halvor per gäst"
+           :minimum 1 :maximum 200 :pieces 2}
+   "whole" {:label "Hela" :unit "hela smörrebröd" :per-person "Hela per gäst"
+            :minimum 0.5 :maximum 100 :pieces 1}})
 
-(defn quantity [row] (if (valid-number? (:qty row) 0 1000000 true) (number-value (:qty row)) 0))
+(defn portion-size [order]
+  (:portion-size order "whole"))
+
+(defn portion [order]
+  (get portion-options (portion-size order)))
+
+(defn valid-settings? [order]
+  (let [{:keys [minimum maximum]} (portion order)]
+    (and (some? minimum)
+         (valid-number? (:guests order) 1 10000 true)
+         (valid-number? (:per-person order) minimum maximum false))))
+
+(defn quantity [row]
+  (if (valid-number? (:qty row) 0 2000000 true)
+    (number-value (:qty row))
+    0))
 
 (defn valid-rows? [order]
-  (every? (fn [[_ row]] (valid-number? (:qty row) 0 1000000 true)) (:rows order)))
+  (every? (fn [[_ row]] (valid-number? (:qty row) 0 2000000 true)) (:rows order)))
 
 (defn target [order]
   (when (valid-settings? order)
@@ -181,18 +198,23 @@
 
 (defn default-order []
   (let [active-count (count (remove :initially-off? menu))]
-    (distribute {:guests 25 :per-person 3
+    (distribute {:guests 25 :per-person 4 :portion-size "half"
                  :rows (into {} (map (fn [{:keys [id initially-off?]}]
                                        [id {:enabled? (not initially-off?) :qty 0
                                             :share (if initially-off? 0 (/ 1 active-count))}]) menu))})))
 
 (defn valid-stored-order? [order]
-  (and (map? order) (valid-settings? order) (map? (:rows order))
+  (and (map? order)
+       (contains? portion-options (:portion-size order))
+       (valid-settings? order)
+       (map? (:rows order))
        (every? #(contains? (:rows order) (:id %)) menu)
        (every? #(contains? menu-by-id %) (keys (:rows order)))
-       (every? (fn [[_ row]] (and (map? row) (boolean? (:enabled? row))
-                                  (valid-number? (:qty row) 0 1000000 true)
-                                  (or (:enabled? row) (zero? (quantity row))))) (:rows order))))
+       (every? (fn [[_ row]]
+                 (and (map? row) (boolean? (:enabled? row))
+                      (valid-number? (:qty row) 0 2000000 true)
+                      (or (:enabled? row) (zero? (quantity row)))))
+               (:rows order))))
 
 (defn valid-stored-shares? [order]
   (and (every? (fn [[_ row]]
@@ -202,35 +224,60 @@
          (or (< (js/Math.abs (- total 1)) 1e-9)
              (and (zero? total) (zero? (:total (totals order))))))))
 
+(defn change-portion-size [order size]
+  (if (and (contains? portion-options size)
+           (not= size (portion-size order))
+           (valid-settings? order)
+           (valid-rows? order)
+           (valid-stored-shares? order))
+    (let [ratio (/ (:pieces (get portion-options size)) (:pieces (portion order)))]
+      (distribute (assoc order :portion-size size
+                         :per-person (* (number-value (:per-person order)) ratio))))
+    order))
+
+(defn read-stored-order [{:keys [version order]}]
+  (when (and (#{1 2 3 4} version) (map? order))
+    (let [migrated (if (= 4 version) order (assoc order :portion-size "whole"))]
+      (when (and (valid-stored-order? migrated)
+                 (or (= 1 version) (valid-stored-shares? migrated)))
+        (if (= 1 version) (update-shares migrated) migrated)))))
+
 ;; Share stable dish IDs and full-precision shares, independently of local storage.
 (def site-url "https://agical.github.io/matrosen/")
 
 (defn shareable? [order]
-  (and (valid-stored-order? order) (valid-stored-shares? order)))
+  (and (valid-stored-order? (assoc order :portion-size (portion-size order)))
+       (valid-stored-shares? order)))
 
 (defn share-link [order]
   (str site-url "#plan="
        (js/encodeURIComponent
         (js/JSON.stringify
-         (clj->js {:v 2 :guests (:guests order) :per-person (:per-person order)
+         (clj->js {:v 3 :guests (:guests order) :per-person (:per-person order)
+                   :portion-size (portion-size order)
                    :rows (mapv (fn [{:keys [id]}]
                                  (let [{:keys [enabled? qty share]} (get-in order [:rows id])]
                                    [(name id) enabled? qty share])) (order-menu order))})))))
+
+(defn shared-order [{:keys [v guests per-person portion-size rows]}]
+  (let [known-ids (into {} (map (fn [{:keys [id]}] [(name id) id]) (if (= 1 v) menu all-menu)))]
+    (when (and (#{1 2 3} v)
+               (vector? rows)
+               (<= (count menu) (count rows) (count known-ids))
+               (every? #(and (vector? %) (= 4 (count %)) (contains? known-ids (first %))) rows)
+               (= (count rows) (count (set (map first rows)))))
+      {:guests guests :per-person per-person :portion-size (if (= 3 v) portion-size "whole")
+       :rows (into {} (map (fn [[id enabled? qty share]]
+                             [(known-ids id) {:enabled? enabled? :qty qty :share share}]) rows))})))
 
 (defn read-shared-plan [fragment]
   (when (str/starts-with? fragment "#plan=")
     (try
       (when (> (count fragment) 12000) (throw (js/Error. "Oversized shared plan")))
-      (let [{:keys [v guests per-person rows]}
-            (js->clj (js/JSON.parse (js/decodeURIComponent (subs fragment 6))) :keywordize-keys true)
-            known-ids (into {} (map (fn [{:keys [id]}] [(name id) id]) (if (= 1 v) menu all-menu)))]
-        (if (and (#{1 2} v) (vector? rows) (<= (count menu) (count rows) (count known-ids))
-                 (every? #(and (vector? %) (= 4 (count %)) (contains? known-ids (first %))) rows)
-                 (= (count rows) (count (set (map first rows)))))
-          (let [order {:guests guests :per-person per-person
-                       :rows (into {} (map (fn [[id enabled? qty share]]
-                                             [(known-ids id) {:enabled? enabled? :qty qty :share share}]) rows))}]
-            (if (shareable? order) {:order order} {:error true}))
+      (let [payload (js->clj (js/JSON.parse (js/decodeURIComponent (subs fragment 6))) :keywordize-keys true)
+            order (shared-order payload)]
+        (if (and order (valid-stored-order? order) (valid-stored-shares? order))
+          {:order order}
           {:error true}))
       (catch :default _ {:error true}))))
 
@@ -238,15 +285,16 @@
   (.toLocaleString n "sv-SE" #js {:maximumFractionDigits 2}))
 
 (defn order-text [value]
-  (let [{:keys [total vego gluten-free]} (totals value)]
+  (let [{:keys [total vego gluten-free]} (totals value)
+        {:keys [unit per-person]} (portion value)]
     (str/join "\n"
-              (concat ["Smörrebrödsplaneraren" ""]
+              (concat ["Smörrebrödsplaneraren" (str "Serveras som " unit ".") ""]
                       (keep (fn [{:keys [id vego?] :as dish}]
                               (let [row (get-in value [:rows id]) n (quantity row)]
                                 (when (and (:enabled? row) (pos? n))
-                                  (str n " × " (dish-label dish) (when vego? " (vego*)"))))) (order-menu value))
-                      ["" (str "Totalt: " total " smörrebröd, varav " vego " vego*.")
-                       (str "Glutenfria: " gluten-free " smörrebröd.")
+                                  (str n " " unit " × " (dish-label dish) (when vego? " (vego*)"))))) (order-menu value))
+                      ["" (str "Totalt: " total " " unit ", varav " vego " vego*.")
+                       (str "Glutenfria: " gluten-free " " unit ".")
                        (str "Antal gäster: " (format-number (number-value (:guests value))))
-                       (str "Smörrebröd per person: " (format-number (/ total (number-value (:guests value)))))
+                       (str per-person ": " (format-number (/ total (number-value (:guests value)))))
                        "" "*Vego enligt menybeskrivningarna, inklusive ägg och mjölk. Bekräfta med Matrosen."]))))

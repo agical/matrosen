@@ -1,6 +1,6 @@
 (ns matrosen.views
   (:require [matrosen.photos :as photos]
-            [matrosen.model :refer [menu menu-by-id order-menu dish-label gluten-free-id menu-url restaurant-url valid-number? valid-settings? valid-rows? quantity totals target active-ids share-total format-number]]))
+            [matrosen.model :refer [menu-by-id order-menu dish-label gluten-free-id menu-url restaurant-url valid-number? valid-settings? valid-rows? quantity totals target active-ids share-total format-number]]))
 
 ;; Presentation reads the same calculations used by the order actions.
 (defn icon [kind]
@@ -32,7 +32,7 @@
        (if photo (str "Foto: " (:credit photo)) "Se Matrosens meny") (icon :arrow)]]]))
 
 (defn menu-row [value preview {:keys [id name description vego? gluten-free?] :as dish}]
-  (let [row (get-in value [:rows id]) valid? (valid-number? (:qty row) 0 1000000 true)
+  (let [row (get-in value [:rows id]) valid? (valid-number? (:qty row) 0 2000000 true)
         label (dish-label dish)
         desired (target value)
         editable? (and (:enabled? row) desired (> (count (active-ids value)) 1))
@@ -66,8 +66,8 @@
        [:button.qty-step {:type "button" :aria-label (str "Minska " label)
                           :disabled (or (not step-enabled?) (zero? (quantity row)))
                           :on {:click [[:order/ax.step id -1]]}} "−"]
-       [:input.qty-input {:id field-id :type "number" :inputmode "numeric" :min 0 :max (or desired 1000000) :step 1
-                          :aria-label (str "Antal " label) :aria-invalid (not valid?)
+       [:input.qty-input {:id field-id :type "number" :inputmode "numeric" :min 0 :max (or desired 2000000) :step 1
+                          :aria-label (str "Antal " (:unit (matrosen.model/portion value)) " " label) :aria-invalid (not valid?)
                           :aria-describedby (when-not valid? "quantity-error")
                           :value (:qty row) :disabled (not editable?)
                           :on {:focus [[:ui/ax.select-input field-id]]
@@ -77,6 +77,51 @@
                           :on {:click [[:order/ax.step id 1]]}} "+"]]]
      [:td.numeric.veg-number {:class (when-not vego? "no-veg")}
       (if vego? (quantity row) [:span {:aria-label "0 vegetariska"} "–"])]]))
+
+(defn portion-selector [value]
+  [:fieldset.portion-field {:disabled (not (and (valid-settings? value) (valid-rows? value)))
+                            :aria-describedby (when-not (and (valid-settings? value) (valid-rows? value)) "portion-error")}
+   [:legend "Halvor/hela"]
+   [:div.portion-options
+    (for [size ["half" "whole"]]
+      [:label {:for (str "portion-" size) :replicant/key size}
+       [:input {:id (str "portion-" size) :type "radio" :name "portion-size" :value size
+                :checked (= size (matrosen.model/portion-size value))
+                :on {:change [[:order/ax.portion-size size]]}}]
+       [:span (:label (get matrosen.model/portion-options size))]])]])
+
+(defn planner [value]
+  (let [desired (target value)
+        ids (active-ids value)
+        settings-valid? (valid-settings? value)
+        {:keys [unit per-person minimum maximum]} (matrosen.model/portion value)]
+    [:section.planner {:aria-label "Planera antal"}
+     [:div.planner-fields
+      (portion-selector value)
+      [:div.field [:label {:for "guests"} "Antal gäster"]
+       [:input#guests.plan-input {:type "number" :inputmode "numeric" :min 1 :max 10000 :step 1
+                                   :value (:guests value) :aria-invalid (not (valid-number? (:guests value) 1 10000 true))
+                                   :aria-describedby (when-not settings-valid? "settings-error")
+                                   :on {:focus [[:ui/ax.select-input "guests"]]
+                                        :input [[:order/ax.edit [:guests] :event/target.value]]}}]]
+      [:div.field [:label {:for "per-person"} per-person]
+       [:input#per-person.plan-input {:type "number" :inputmode "decimal" :min minimum :max maximum :step "any"
+                                       :value (:per-person value) :aria-invalid (not (valid-number? (:per-person value) minimum maximum false))
+                                       :aria-describedby (if settings-valid? "target-note" "settings-error")
+                                       :on {:focus [[:ui/ax.select-input "per-person"]]
+                                            :input [[:order/ax.edit [:per-person] :event/target.value]]}}]]]
+     [:p.portion-hint "Matrosen rekommenderar 4 halvor per gäst."]
+     [:p#target-note.target-note
+      (if desired (list "Mål: " [:strong (str (format-number desired) " " unit)] ". ") "")
+      "Ändrar du planeringen fördelas beställningen enligt den sparade fördelningen. Ändrar du en rad hålls det antalet fast och resten fördelas."]
+     (when-not settings-valid?
+       [:p#settings-error.error (str "Ange 1–10 000 hela gäster och " (format-number minimum) "–" (format-number maximum) " " unit " per gäst.")])
+     (when-not (and settings-valid? (valid-rows? value))
+       [:p#portion-error.error "Rätta de markerade antalen innan du byter mellan halvor och hela."])
+     (cond
+       (empty? ids) [:p.error "Aktivera minst en sort för att fördela."]
+       (= 1 (count ids)) [:p.target-note "En enda aktiv sort får hela målantalet. Aktivera en sort till för att justera fördelningen."]
+       (zero? (share-total value)) [:p.error "Öka antalet på minst en rad för att skapa en fördelning."])]))
 
 (defn app [{:keys [order ui]}]
   (let [value order {:keys [total vego gluten-free]} (totals value) desired (target value)
@@ -88,28 +133,7 @@
      [:header.masthead
       [:div [:h1 "Smörrebrödsplaneraren"] [:p.subtitle "Ordna mat till eventet från Matrosen Smörrebröd"]]
       [:a.event-link {:href restaurant-url :target "_blank" :rel "noreferrer"} "Matrosen Smörrebröd" (icon :arrow)]]
-     [:section.planner {:aria-label "Planera antal"}
-      [:div.planner-fields
-       [:div.field [:label {:for "guests"} "Antal gäster"]
-        [:input#guests.plan-input {:type "number" :inputmode "numeric" :min 1 :max 10000 :step 1
-                                   :value (:guests value) :aria-invalid (not (valid-number? (:guests value) 1 10000 true))
-                                   :aria-describedby (when-not settings-valid? "settings-error")
-                                   :on {:focus [[:ui/ax.select-input "guests"]]
-                                        :input [[:order/ax.edit [:guests] :event/target.value]]}}]]
-       [:div.field [:label {:for "per-person"} "Smörrebröd per person"]
-        [:input#per-person.plan-input {:type "number" :inputmode "decimal" :min 0.5 :max 100 :step "any"
-                                       :value (:per-person value) :aria-invalid (not (valid-number? (:per-person value) 0.5 100 false))
-                                       :aria-describedby (if settings-valid? "target-note" "settings-error")
-                                       :on {:focus [[:ui/ax.select-input "per-person"]]
-                                            :input [[:order/ax.edit [:per-person] :event/target.value]]}}]]]
-      [:p#target-note.target-note
-       (if desired (list "Mål: " [:strong (str (format-number desired) " smörrebröd")] ". ") "")
-       "Ändrar du gäster eller smörrebröd per person fördelas beställningen enligt den sparade fördelningen. Ändrar du en rad hålls det antalet fast och resten fördelas."]
-      (when-not settings-valid? [:p#settings-error.error "Ange 1–10 000 hela gäster och 0,5–100 smörrebröd per person."])
-      (cond
-        (empty? ids) [:p.error "Aktivera minst en sort för att fördela."]
-        (= 1 (count ids)) [:p.target-note "En enda aktiv sort får hela målantalet. Aktivera en sort till för att justera fördelningen."]
-        (zero? (share-total value)) [:p.error "Öka antalet på minst en rad för att skapa en fördelning."])]
+     (planner value)
      [:section {:aria-labelledby "order-title"}
       [:div.order-heading
        [:div.heading-line [:h2#order-title "Din beställning"] [:span.sort-count (str (count ids) " av " (count dishes) " sorter")]]
@@ -127,13 +151,13 @@
         [:caption.sr-only "Smörrebröd: välj sorter, ändra antal och se hur många som är vegetariska."]
         [:colgroup [:col.include-col] [:col] [:col.qty-col] [:col.veg-col]]
         [:thead [:tr [:th {:scope "col"} "Med"] [:th {:scope "col"} "Smörrebröd"]
-                 [:th.numeric {:scope "col"} "Antal"] [:th.numeric {:scope "col"} "Vego*"]]]
+                 [:th.numeric {:scope "col"} (:label (matrosen.model/portion value))] [:th.numeric {:scope "col"} "Vego*"]]]
         [:tbody (for [dish dishes] (menu-row value (:preview ui) dish))]
         [:tfoot
          [:tr
           [:th {:scope "row" :colspan 2}
            [:div.footer-overview
-            [:div.footer-label "Totalt" [:span.total-sub "smörrebröd"]]
+            [:div.footer-label "Totalt" [:span.total-sub (:unit (matrosen.model/portion value))]]
             [:div.footer-gluten
              [:span#gluten-free-count.footer-number (if rows-valid? gluten-free "–")]
              [:span.total-sub "glutenfria"]]]]

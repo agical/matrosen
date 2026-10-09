@@ -30,6 +30,18 @@ h1{font-family:'Bodoni Moda',serif;font-size:42px;font-weight:500;line-height:1.
 .planner-fields{display:flex;align-items:flex-end;gap:var(--space-xl);flex-wrap:wrap}
 .field{display:flex;flex-direction:column;gap:var(--space-sm)}
 .field label{font-size:14px;font-weight:600}
+.portion-field{min-width:0;max-width:100%;margin:0;padding:0;border:0}
+.portion-field legend{margin-bottom:var(--space-sm);padding:0;font-size:14px;font-weight:600}
+.portion-options{display:flex;flex-wrap:wrap;gap:var(--space-sm)}
+.portion-options label{display:inline-flex;align-items:center;gap:var(--space-sm);min-height:46px;padding:10px 12px;border:1px solid var(--line);border-radius:5px;background:var(--surface);font-size:14px;font-weight:600;cursor:pointer}
+.portion-options input[type=radio]{flex:none;width:18px;height:18px;margin:0;accent-color:var(--ink);cursor:pointer}
+.portion-options label:hover:has(:enabled){border-color:var(--muted);background:var(--soft)}
+.portion-options label:has(:checked){border-color:var(--ink);background:var(--soft)}
+.portion-options label:has(:disabled){cursor:not-allowed;opacity:.48}
+.portion-options input:disabled{cursor:not-allowed}
+.portion-options label:has(:focus-visible){outline:3px solid oklch(54% .15 260);outline-offset:4px}
+.portion-options input:focus-visible{outline:0}
+.portion-hint{max-width:65ch;margin:12px 0 0;font-size:13px;color:var(--muted)}
 input[type=number]{appearance:textfield;-moz-appearance:textfield;border:1px solid var(--line);border-radius:5px;background:var(--surface);font-variant-numeric:tabular-nums}
 input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
 .plan-input{width:84px;height:46px;padding:8px 12px;font-size:20px;font-weight:600}
@@ -130,6 +142,7 @@ textarea{width:100%;min-height:220px;padding:16px;border:1px solid var(--line);b
   .shell{padding:24px 16px}.masthead{gap:12px;padding-bottom:20px}
   h1{font-size:clamp(24px,6vw,34px)}.subtitle{font-size:12px}.event-link{font-size:12px}
   .planner{padding:20px 0 24px}.planner-fields{column-gap:24px;row-gap:16px}
+  .portion-field{flex-basis:100%}
   .order-heading{align-items:flex-start;flex-wrap:wrap;gap:12px}.heading-line{display:block}.sort-count{display:block;margin-top:4px}
   .secondary{padding:9px 10px}
   h2{font-size:18px}col.include-col{width:32px}col.qty-col{width:96px}col.veg-col{width:44px}
@@ -143,6 +156,7 @@ textarea{width:100%;min-height:220px;padding:16px;border:1px solid var(--line);b
   tfoot th{padding-left:12px;font-size:13px}tfoot td{padding-left:8px;padding-right:12px;font-size:21px}
   .footer-overview{gap:8px}.footer-number{font-size:21px}
   tfoot .total-sub{font-size:10px;white-space:nowrap}
+  tfoot .footer-label .total-sub{white-space:normal}
   tfoot td:last-child .total-sub{white-space:normal}
   .balance{gap:8px}.footer{gap:12px;flex-wrap:wrap}.menu-note{font-size:12px}
 }

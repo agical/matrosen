@@ -40,7 +40,7 @@
 
     :storage/fx.save
     (try (.setItem js/localStorage model/storage-key
-                   (js/JSON.stringify (clj->js {:version 3 :order (first args)})))
+                   (js/JSON.stringify (clj->js {:version 4 :order (assoc (first args) :portion-size (model/portion-size (first args)))})))
          {:success true}
          (catch :default _ {:success false}))
 
