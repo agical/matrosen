@@ -86,11 +86,12 @@
   (if (valid-rows? order)
     (let [total (:total (totals order))]
       (update order :rows
-              (fn [rows]
-                (into {} (map (fn [[id row]]
-                                [id (assoc row :share
-                                           (if (and (:enabled? row) (pos? total))
-                                             (/ (quantity row) total) 0))]) rows)))))
+              update-vals
+              (fn [row]
+                (assoc row :share
+                       (if (and (:enabled? row) (pos? total))
+                         (/ (quantity row) total)
+                         0)))))
     order))
 
 ;; Largest remainders make whole breads add up to the target. Menu order breaks ties.

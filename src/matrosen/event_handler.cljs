@@ -37,7 +37,7 @@
    action-list))
 
 (defn replace-result [form result]
-  (walk/postwalk #(if (= :uf/prev-result %) result %) form))
+  (walk/postwalk-replace {:uf/prev-result result} form))
 
 (defn execute-effects! [fxs]
   (reduce
